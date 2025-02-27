@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Digital Room Key Download Link</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .logo {
+            max-width: 150px;
+            margin-bottom: 10px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            padding: 12px 25px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .footer {
+            background-color: #f5f8fa;
+            padding: 15px;
+            text-align: center;
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="{{ hotel_logo_url }}" alt="{{ hotel_name }} Logo" class="logo">
+            <h1>Your Digital Room Key</h1>
+        </div>
+        <div class="content">
+            <p>Hello {{ guest_name }},</p>
+            <p>Thank you for choosing to stay at {{ hotel_name }}! Your digital room key is ready to be downloaded.</p>
+            
+            <p>Please click the button below to download your digital room key:</p>
+            
+            <div style="text-align: center;">
+                <a href="{{ download_url }}" class="button">Download Room Key</a>
+            </div>
+            
+            <p>Once downloaded, you can add the key to your mobile wallet and use your phone to unlock your room door during your stay.</p>
+            
+            <p>If you have any questions or need assistance, please contact our front desk.</p>
+            
+            <p>We look forward to welcoming you!</p>
+            <p>Best regards,<br>The {{ hotel_name }} Team</p>
+        </div>
+        <div class="footer">
+            <p>© {{ current_year }} {{ hotel_name }}. All rights reserved.</p>
+            <p><a href="{{ hotel_website }}">{{ hotel_website }}</a></p>
+        </div>
+    </div>
+</body>
+</html>

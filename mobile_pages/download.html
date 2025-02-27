@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Digital Room Key</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        .logo {
+            max-width: 150px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .room-info {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f5f8fa;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+            text-align: left;
+        }
+        .button {
+            display: inline-block;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-weight: bold;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .button.apple {
+            background-color: #000;
+        }
+        .button.google {
+            background-color: #4285F4;
+        }
+        .button-container {
+            margin: 30px 0;
+        }
+        .icon {
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+        .footer {
+            margin-top: 30px;
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,0.1);
+            border-radius: 50%;
+            border-top-color: #3498db;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .error-message {
+            color: #e74c3c;
+            padding: 10px;
+            background-color: #f8d7da;
+            border-left: 4px solid #e74c3c;
+            margin: 20px 0;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="assets/logo.png" alt="Hotel Logo" class="logo" id="hotelLogo">
+        
+        <h1>Your Digital Room Key</h1>
+        
+        <p>Thank you for choosing to stay with us! Your digital room key is ready to be added to your smartphone wallet.</p>
+        
+        <div class="room-info">
+            <h3>Your Reservation Details</h3>
+            <p><strong>Room:</strong> <span id="roomNumber">Loading...</span></p>
+            <p><strong>Guest:</strong> <span id="guestName">Loading...</span></p>
+            <p><strong>Check-in:</strong> <span id="checkIn">Loading...</span></p>
+            <p><strong>Check-out:</strong> <span id="checkOut">Loading...</span></p>
+        </div>
+        
+        <p>Select your device type to add the key to your wallet:</p>
+        
+        <div class="button-container">
+            <a href="#" id="appleWalletBtn" class="button apple">
+                <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2Z" stroke="white" stroke-width="2"/>
+                    <path d="M16 10.5C16 8.567 14.433 7 12.5 7H11.5C9.567 7 8 8.567 8 10.5V13.5C8 15.433 9.567 17 11.5 17H12.5C14.433 17 16 15.433 16 13.5V10.5Z" stroke="white" stroke-width="2"/>
+                </svg>
+                Add to Apple Wallet
+            </a>
+            
+            <a href="#" id="googleWalletBtn" class="button google">
+                <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20 4H4C2.89543 4 2 4.89543 2 6V18C2 19.1046 2.89543 20 4 20H20C21.1046 20 22 19.1046 22 18V6C22 4.89543 21.1046 4 20 4Z" stroke="white" stroke-width="2"/>
+                    <path d="M2 10H22" stroke="white" stroke-width="2"/>
+                </svg>
+                Add to Google Wallet
+            </a>
+        </div>
+        
+        <p>Once added to your wallet, you can use your phone to unlock your room door during your stay.</p>
+        
+        <div class="footer">
+            <p>Need help? Contact our front desk for assistance.</p>
+            <p>© <span id="currentYear">2025</span> Your Hotel. All rights reserved.</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get the key ID from the URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const keyId = urlParams.get('key_id');
+            
+            if (!keyId) {
+                showError("No key ID provided. Please check your link and try again.");
+                return;
+            }
+            
+            // Set current year
+            document.getElementById('currentYear').textContent = new Date().getFullYear();
+            
+            // Fetch key details from API
+            fetchKeyDetails(keyId);
+            
+            // Set up wallet buttons
+            document.getElementById('appleWalletBtn').addEventListener('click', function(e) {
+                e.preventDefault();
+                addToAppleWallet(keyId);
+            });
+            
+            document.getElementById('googleWalletBtn').addEventListener('click', function(e) {
+                e.preventDefault();
+                addToGoogleWallet(keyId);
+            });
+        });
+        
+        function fetchKeyDetails(keyId) {
+            // In a real implementation, make an API call to get key details
+            // For demo purposes, we'll simulate API response
+
+            // Show loading state
+            document.getElementById('roomNumber').innerHTML = '<span class="loading"></span>';
+            document.getElementById('guestName').innerHTML = '<span class="loading"></span>';
+            document.getElementById('checkIn').innerHTML = '<span class="loading"></span>';
+            document.getElementById('checkOut').innerHTML = '<span class="loading"></span>';
+            
+            // Simulate API call delay
+            setTimeout(() => {
+                // Simulate API response
+                const keyData = {
+                    room_number: "304",
+                    guest_name: "John Smith",
+                    check_in: "2025-02-28T15:00:00",
+                    check_out: "2025-03-03T11:00:00",
+                    hotel_name: "Your Hotel",
+                    hotel_logo_url: "assets/logo.png"
+                };
+                
+                // Update the page with key details
+                document.getElementById('roomNumber').textContent = keyData.room_number;
+                document.getElementById('guestName').textContent = keyData.guest_name;
+                document.getElementById('checkIn').textContent = formatDate(keyData.check_in);
+                document.getElementById('checkOut').textContent = formatDate(keyData.check_out);
+                
+                // Update page title and logo
+                document.title = `Room Key - ${keyData.hotel_name}`;
+                if (keyData.hotel_logo_url) {
+                    document.getElementById('hotelLogo').src = keyData.hotel_logo_url;
+                }
+            }, 1500);
+        }
+        
+        function addToAppleWallet(keyId) {
+            // In a real implementation, this would redirect to or download the Apple Wallet pass
+            // For demo purposes, we'll just show an alert
+            alert("Redirecting to Apple Wallet pass download...");
+            
+            // Simulate redirect to pass URL
+            window.location.href = `/api/v1/passes/apple/${keyId}`;
+        }
+        
+        function addToGoogleWallet(keyId) {
+            // In a real implementation, this would redirect to Google Wallet
+            // For demo purposes, we'll just show an alert
+            alert("Redirecting to Google Wallet...");
+            
+            // Simulate redirect to Google Wallet URL
+            window.location.href = `/api/v1/passes/google/${keyId}`;
+        }
+        
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: 'numeric',
+                hour12: true
+            });
+        }
+        
+        function showError(message) {
+            const container = document.querySelector('.container');
+            container.innerHTML = `
+                <img src="assets/logo.png" alt="Hotel Logo" class="logo">
+                <h1>Oops! Something went wrong</h1>
+                <div class="error-message">
+                    <p>${message}</p>
+                </div>
+                <p>If you continue to experience issues, please contact our front desk for assistance.</p>
+            `;
+        }
+    </script>
+</body>
+</html>
