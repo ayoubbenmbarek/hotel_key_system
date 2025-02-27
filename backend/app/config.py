@@ -1,8 +1,11 @@
 # backend/app/config.py
 import os
 import secrets
-from pydantic import BaseSettings, PostgresDsn, field_validator, EmailStr
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any, Union, List
+
+# In Pydantic v2, BaseSettings has been moved to pydantic-settings
+from pydantic_settings import BaseSettings
+from pydantic import PostgresDsn, EmailStr, field_validator, model_validator
 
 
 class Settings(BaseSettings):
@@ -17,20 +20,24 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "hotel_keys")
     SQLALCHEMY_DATABASE_URI: Optional[PostgresDsn] = None
 
-    @field_validator("SQLALCHEMY_DATABASE_URI", pre=True)
-    def assemble_db_connection(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+    # Use field_validator instead of validator in Pydantic v2
+    @field_validator("SQLALCHEMY_DATABASE_URI", mode="before")
+    @classmethod
+    def assemble_db_connection(cls, v: Optional[str], info) -> Any:
         if isinstance(v, str):
             return v
+        
+        values = info.data
         return PostgresDsn.build(
             scheme="postgresql",
-            user=values.get("POSTGRES_USER"),
+            username=values.get("POSTGRES_USER"),
             password=values.get("POSTGRES_PASSWORD"),
             host=values.get("POSTGRES_SERVER"),
             path=f"/{values.get('POSTGRES_DB') or ''}",
         )
     
     # CORS
-    BACKEND_CORS_ORIGINS: list = ["*"]
+    BACKEND_CORS_ORIGINS: List[str] = ["*"]
     
     # Email settings
     SMTP_TLS: bool = True
