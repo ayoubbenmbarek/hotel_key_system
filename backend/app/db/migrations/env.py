@@ -1,10 +1,15 @@
 from logging.config import fileConfig
-
+import os
+import sys
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-
 from alembic import context
 
+# Add the parent directory to the Python path so we can import app modules
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))))))
+
+# Import models
 from app.config import settings
 from app.models.base import Base
 from app.models.user import User
@@ -22,7 +27,8 @@ config.set_main_option("sqlalchemy.url", str(settings.SQLALCHEMY_DATABASE_URI))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-fileConfig(config.config_file_name)
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
