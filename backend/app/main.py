@@ -1,4 +1,5 @@
 # backend/app/main.py
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
@@ -57,8 +58,86 @@ class TimingMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def create_admin_user():
+    """
+    Create initial admin user if not exists
+    """
+    from app.security import get_password_hash
+    from sqlalchemy.orm import Session
+    from models.user import User
+    from app.db.session import SessionLocal
+
+    try:
+        db = SessionLocal()
+        # Check if admin user already exists
+        existing_admin = db.query(User).filter(User.email == settings.ADMIN_EMAIL).first()
+        print(existing_admin, "existing_admin")
+        
+        if not existing_admin:
+            # Create admin user
+            admin_user = User(
+                email='admin@example.com',
+                first_name='Admin',
+                last_name='User',
+                phone_number='1234567890',
+                # admin123
+                hashed_password='$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW',
+                role='ADMIN',
+                is_active=True
+            )
+            db.add(admin_user)
+            db.commit()
+            logger.info("Admin user created successfully")
+        else:
+            logger.info("Admin user already exists")
+    except Exception as e:
+        logger.error(f"Error creating admin user: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
 def create_tables():
-    Base.metadata.create_all(bind=engine)
+    """
+    Create database tables based on SQLAlchemy models
+    """
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Error creating database tables: {e}")
+        raise
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan event handler for FastAPI application
+    
+    Handles startup and shutdown events
+    """
+    # Startup tasks
+    logger.info("Starting up application...")
+    
+    # Create database tables
+    create_tables()
+    print("tables created")
+    
+    # Create admin user
+    # create_admin_user()
+    # print("Admin user created")
+    
+    logger.info("Application startup complete")
+    
+    # Yield control back to the application
+    yield
+    
+    # Shutdown tasks
+    logger.info("Shutting down application...")
+    
+    # Optional: Add any cleanup tasks
+    # For example, closing database connections, clearing caches, etc.
+    logger.info("Application shutdown complete")
 
 
 def get_application():
@@ -66,6 +145,7 @@ def get_application():
         title="Hotel Virtual Key API",
         description="API for managing hotel virtual keys",
         version="1.0.0",
+        lifespan=lifespan,  # Use the new lifespan handler
     )
     
     # Set up CORS
@@ -83,15 +163,6 @@ def get_application():
     
     # Include API router
     app.include_router(api_router, prefix=settings.API_V1_STR)
-    
-    @app.on_event("startup")
-    async def startup_event():
-        logger.info("Starting up application...")
-        create_tables()
-    
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        logger.info("Shutting down application...")
     
     @app.get("/health", tags=["health"])
     def health_check():
