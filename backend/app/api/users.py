@@ -15,7 +15,7 @@ router = APIRouter()
 @router.get("/me", response_model=UserSchema)
 def read_user_me(
     current_user: User = Depends(get_current_user)
-) -> Any:
+) -> Any:  # Use Any as return type
     """
     Get current user information
     """
@@ -153,13 +153,15 @@ def update_user(
     return user
 
 
+# backend/app/api/users.py (partial fix for delete_user function)
+
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
     *,
     db: Session = Depends(get_db),
     user_id: str,
     current_user: User = Depends(get_current_active_admin)
-) -> Any:
+) -> None:  # Change return type to None
     """
     Delete a user (admin only)
     """
@@ -175,4 +177,5 @@ def delete_user(
     db.add(user)
     db.commit()
     
-    return None
+    return None  # Return None instead of any data
+
