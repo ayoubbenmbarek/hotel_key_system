@@ -1,7 +1,7 @@
 # backend/app/api/users.py
-from typing import Any, List
+from typing import Any, List, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -15,7 +15,7 @@ router = APIRouter()
 @router.get("/me", response_model=UserSchema)
 def read_user_me(
     current_user: User = Depends(get_current_user)
-) -> Any:  # Use Any as return type
+):
     """
     Get current user information
     """
@@ -28,16 +28,21 @@ def update_user_me(
     db: Session = Depends(get_db),
     user_in: UserUpdate,
     current_user: User = Depends(get_current_user)
-) -> Any:
+):
     """
     Update own user information
     """
     # Update password if provided
     if user_in.password is not None:
-        user_in.password = get_password_hash(user_in.password)
+        hashed_password = get_password_hash(user_in.password)
+        user_in_data = user_in.model_dump(exclude_unset=True)
+        user_in_data["hashed_password"] = hashed_password
+        user_in_data.pop("password", None)
+    else:
+        user_in_data = user_in.model_dump(exclude_unset=True)
     
     # Update user data in DB
-    for field, value in user_in.dict(exclude_unset=True).items():
+    for field, value in user_in_data.items():
         setattr(current_user, field, value)
     
     db.add(current_user)
@@ -53,7 +58,7 @@ def read_users(
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(get_current_active_admin)
-) -> Any:
+):
     """
     Retrieve users (admin only)
     """
@@ -67,7 +72,7 @@ def create_user(
     db: Session = Depends(get_db),
     user_in: UserCreate,
     current_user: User = Depends(get_current_active_admin)
-) -> Any:
+):
     """
     Create new user (admin only)
     """
@@ -102,7 +107,7 @@ def read_user_by_id(
     user_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_admin)
-) -> Any:
+):
     """
     Get a specific user by id (admin only)
     """
@@ -122,7 +127,7 @@ def update_user(
     user_id: str,
     user_in: UserUpdate,
     current_user: User = Depends(get_current_active_admin)
-) -> Any:
+):
     """
     Update a user (admin only)
     """
@@ -136,11 +141,11 @@ def update_user(
     # Update password if provided
     if user_in.password is not None:
         hashed_password = get_password_hash(user_in.password)
-        user_in_data = user_in.dict(exclude_unset=True)
+        user_in_data = user_in.model_dump(exclude_unset=True)
         user_in_data["hashed_password"] = hashed_password
         user_in_data.pop("password", None)
     else:
-        user_in_data = user_in.dict(exclude_unset=True)
+        user_in_data = user_in.model_dump(exclude_unset=True)
     
     # Update user data in DB
     for field, value in user_in_data.items():
@@ -153,15 +158,13 @@ def update_user(
     return user
 
 
-# backend/app/api/users.py (partial fix for delete_user function)
-
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
     *,
     db: Session = Depends(get_db),
     user_id: str,
     current_user: User = Depends(get_current_active_admin)
-) -> None:  # Change return type to None
+):
     """
     Delete a user (admin only)
     """
@@ -177,5 +180,4 @@ def delete_user(
     db.add(user)
     db.commit()
     
-    return None  # Return None instead of any data
-
+    return None
