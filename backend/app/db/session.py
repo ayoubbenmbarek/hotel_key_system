@@ -6,8 +6,13 @@ from contextlib import contextmanager
 
 from app.config import settings
 
+# Convert the PostgresDsn object to a string
+DATABASE_URL = str(settings.SQLALCHEMY_DATABASE_URI)
+
 # Create SQLAlchemy engine
-engine = create_engine(settings.SQLALCHEMY_DATABASE_URI, pool_pre_ping=True)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
+# Create test session
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Base class for models
