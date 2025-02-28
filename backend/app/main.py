@@ -58,45 +58,6 @@ class TimingMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def create_admin_user():
-    """
-    Create initial admin user if not exists
-    """
-    from app.security import get_password_hash
-    from sqlalchemy.orm import Session
-    from models.user import User
-    from app.db.session import SessionLocal
-
-    try:
-        db = SessionLocal()
-        # Check if admin user already exists
-        existing_admin = db.query(User).filter(User.email == settings.ADMIN_EMAIL).first()
-        print(existing_admin, "existing_admin")
-        
-        if not existing_admin:
-            # Create admin user
-            admin_user = User(
-                email='admin@example.com',
-                first_name='Admin',
-                last_name='User',
-                phone_number='1234567890',
-                # admin123
-                hashed_password='$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW',
-                role='ADMIN',
-                is_active=True
-            )
-            db.add(admin_user)
-            db.commit()
-            logger.info("Admin user created successfully")
-        else:
-            logger.info("Admin user already exists")
-    except Exception as e:
-        logger.error(f"Error creating admin user: {e}")
-        db.rollback()
-    finally:
-        db.close()
-
-
 def create_tables():
     """
     Create database tables based on SQLAlchemy models
@@ -121,11 +82,6 @@ async def lifespan(app: FastAPI):
     
     # Create database tables
     create_tables()
-    print("tables created")
-    
-    # Create admin user
-    # create_admin_user()
-    # print("Admin user created")
     
     logger.info("Application startup complete")
     
