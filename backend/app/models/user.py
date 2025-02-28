@@ -16,6 +16,7 @@ class User(BaseModel):
     """
     User model for all types of users in the system
     """
+    __tablename__ = 'user'
     email = Column(String, unique=True, index=True, nullable=False)
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)

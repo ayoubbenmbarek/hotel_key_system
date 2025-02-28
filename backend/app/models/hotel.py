@@ -32,6 +32,7 @@ class HotelStaff(BaseModel):
     """
     Association between users and hotels for staff members
     """
+    __tablename__ = 'hotelstaff'
     user_id = Column(String, ForeignKey("user.id"), nullable=False)
     hotel_id = Column(String, ForeignKey("hotel.id"), nullable=False)
     position = Column(String)
