@@ -1,5 +1,5 @@
 # backend/app/schemas/user.py
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -20,13 +20,13 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
     
-    @validator('password')
+    @field_validator('password')
     def password_min_length(cls, v):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
         return v
     
-    @validator('phone_number')
+    @field_validator('phone_number')
     def validate_phone(cls, v):
         if v is not None:
             # Remove any non-digit characters
@@ -45,7 +45,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     is_active: Optional[bool] = None
     
-    @validator('password')
+    @field_validator('password')
     def password_min_length(cls, v):
         if v is not None and len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
@@ -58,8 +58,10 @@ class UserInDBBase(UserBase):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        orm_mode = True
+    # In Pydantic v2, orm_mode is replaced with model_config
+    model_config = {
+        "from_attributes": True
+    }
 
 
 # Additional properties to return via API
