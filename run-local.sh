@@ -52,21 +52,20 @@ alembic upgrade head
 
 # Check if admin user exists
 echo "Checking if admin user exists..."
-ADMIN_EXISTS=$(psql -U postgres -d hotel_keys -t -c "SELECT COUNT(*) FROM users WHERE email='admin@example.com';" | tr -d '[:space:]')
+ADMIN_EXISTS=$(docker-compose exec db psql -U postgres -d hotel_keys -t -c "SELECT COUNT(*) FROM \"user\" WHERE email='admin@example.com';" | tr -d '[:space:]')
 
 if [ "$ADMIN_EXISTS" = "0" ]; then
     echo "Creating admin user..."
-    psql -U postgres -d hotel_keys -c "
-    INSERT INTO users (id, email, first_name, last_name, phone_number, hashed_password, role, is_active, created_at, updated_at)
+    docker-compose exec db psql -U postgres -d hotel_keys -c "
+    INSERT INTO \"user\" (id, email, first_name, last_name, phone_number, hashed_password, role, is_active, created_at, updated_at)
     VALUES (
         gen_random_uuid(),
         'admin@example.com',
         'Admin',
         'User',
         '1234567890',
-        -- Password: admin123 (hashed with bcrypt)
         '\$2b\$12\$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW',
-        'admin',
+        'ADMIN',
         true,
         NOW(),
         NOW()
@@ -83,4 +82,4 @@ cd backend
 uvicorn app.main:app --reload
 
 echo "System is ready!"
-echo "Access the API at: http://localhost:8000/docs"
+echo "Access the API at: http://localhost:8000/api/v1/docs"
