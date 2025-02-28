@@ -76,8 +76,8 @@ The system consists of the following components:
 ## API Documentation
 
 Once the backend is running, access the API documentation at:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Swagger UI: http://localhost:8000/api/v1/docs
+- ReDoc: http://localhost:8000/api/v1/redoc
 
 ## Key Endpoints
 
