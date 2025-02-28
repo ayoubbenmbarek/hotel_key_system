@@ -21,17 +21,17 @@ RUN pip install --upgrade pip \
     && pip install poetry \
     && poetry config virtualenvs.create false
 
-# Copy only requirements to cache them in docker layer
+# Copy only pyproject.toml first
 COPY pyproject.toml /app/
 
-# Generate poetry.lock if it doesn't exist
-RUN if [ ! -f poetry.lock ]; then poetry lock; fi
-
-# Copy project files
-COPY . /app/
+# Generate a fresh lock file
+RUN poetry lock
 
 # Install project dependencies
 RUN poetry install --no-interaction --no-ansi --no-root
+
+# Copy the rest of the application
+COPY . /app/
 
 # Create necessary directories
 RUN mkdir -p /app/logs
