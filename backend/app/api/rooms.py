@@ -228,7 +228,7 @@ def update_room(
             )
     
     # Update room data
-    for field, value in room_in.dict(exclude_unset=True).items():
+    for field, value in room_in.model_dump(exclude_unset=True).items():
         setattr(room, field, value)
     
     db.add(room)

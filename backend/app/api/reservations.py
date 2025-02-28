@@ -191,7 +191,7 @@ def update_reservation(
             )
     
     # Update reservation data
-    for field, value in reservation_in.dict(exclude_unset=True).items():
+    for field, value in reservation_in.model_dump(exclude_unset=True).items():
         setattr(reservation, field, value)
     
     db.add(reservation)

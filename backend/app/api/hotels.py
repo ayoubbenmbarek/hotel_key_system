@@ -99,7 +99,7 @@ def update_hotel(
         )
     
     # Update hotel data
-    for field, value in hotel_in.dict(exclude_unset=True).items():
+    for field, value in hotel_in.model_dump(exclude_unset=True).items():
         setattr(hotel, field, value)
     
     db.add(hotel)

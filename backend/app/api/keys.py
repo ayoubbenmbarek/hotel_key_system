@@ -188,7 +188,7 @@ def update_key(
         )
     
     # Update key data
-    for field, value in key_in.dict(exclude_unset=True).items():
+    for field, value in key_in.model_dump(exclude_unset=True).items():
         setattr(key, field, value)
     
     db.add(key)
