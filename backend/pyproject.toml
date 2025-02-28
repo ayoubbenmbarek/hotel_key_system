@@ -11,7 +11,7 @@ package-mode = false
 python = "^3.10"
 fastapi = "^0.103.1"
 uvicorn = "^0.23.2"
-pydantic = "^2.3.0"
+pydantic = {extras = ["email"], version = "^2.10.6"}
 pydantic-settings = "^2.0.0"  # Added for BaseSettings
 sqlalchemy = "^2.0.20"
 alembic = "^1.12.0"
