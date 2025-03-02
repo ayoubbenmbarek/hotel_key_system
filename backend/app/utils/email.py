@@ -1,5 +1,6 @@
 # backend/app/utils/email.py
 import logging
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
@@ -102,12 +103,12 @@ def send_email(
                 recipients.extend(cc)
             if bcc:
                 recipients.extend(bcc)
-            
+
             server.send_message(msg)
-        
+
         logger.info(f"Email sent successfully to {msg['To']}")
         return True
-    
+
     except Exception as e:
         logger.error(f"Failed to send email: {str(e)}")
         return False
@@ -118,7 +119,7 @@ def send_test_email(email_to: str) -> bool:
     Send a test email to verify the email configuration
     """
     subject = f"Test email from {settings.HOTEL_NAME}"
-    
+
     html_content = f"""
     <html>
         <body>
@@ -128,14 +129,14 @@ def send_test_email(email_to: str) -> bool:
         </body>
     </html>
     """
-    
+
     text_content = f"""
     Test Email
     
     This is a test email from the {settings.HOTEL_NAME} Virtual Key System.
     If you received this email, the email configuration is working correctly.
     """
-    
+
     return send_email(
         email_to=email_to,
         subject=subject,
@@ -149,16 +150,16 @@ def send_welcome_email(email_to: str, first_name: str) -> bool:
     Send a welcome email to a new user
     """
     subject = f"Welcome to {settings.HOTEL_NAME}"
-    
+
     html_content = render_template(
         "welcome_email.html",
         first_name=first_name,
         hotel_name=settings.HOTEL_NAME,
         hotel_logo_url=settings.HOTEL_LOGO_URL,
         hotel_website=settings.FRONTEND_URL,
-        current_year=datetime.datetime.now().year
+        current_year=datetime.now().year
     )
-    
+
     text_content = f"""
     Welcome to {settings.HOTEL_NAME}!
     
@@ -169,7 +170,7 @@ def send_welcome_email(email_to: str, first_name: str) -> bool:
     Best regards,
     The {settings.HOTEL_NAME} Team
     """
-    
+
     return send_email(
         email_to=email_to,
         subject=subject,

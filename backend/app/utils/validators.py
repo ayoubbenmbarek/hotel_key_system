@@ -1,6 +1,6 @@
 # backend/app/utils/validators.py
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 
@@ -58,7 +58,7 @@ def validate_reservation_dates(check_in: datetime, check_out: datetime) -> tuple
     - Check-in cannot be in the past
     - Reservation cannot be more than 30 days
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     
     if check_in < now:
         return False, "Check-in date cannot be in the past"
