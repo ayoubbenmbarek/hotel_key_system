@@ -1,6 +1,7 @@
 # backend/app/api/rooms.py
 from typing import Any, List
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -116,7 +117,6 @@ def read_available_rooms(
     Find available rooms for a given date range
     """
     # Convert string dates to datetime
-    from datetime import datetime
     try:
         check_in_date = datetime.fromisoformat(check_in)
         check_out_date = datetime.fromisoformat(check_out)
@@ -220,21 +220,21 @@ def update_room(
             Room.nfc_lock_id == room_in.nfc_lock_id,
             Room.id != room_id
         ).first()
-        
+
         if existing_lock:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Lock ID {room_in.nfc_lock_id} is already in use"
             )
-    
+
     # Update room data
     for field, value in room_in.model_dump(exclude_unset=True).items():
         setattr(room, field, value)
-    
+
     db.add(room)
     db.commit()
     db.refresh(room)
-    
+
     return room
 
 
@@ -244,7 +244,7 @@ def deactivate_room(
     db: Session = Depends(get_db),
     room_id: str,
     current_user: User = Depends(get_current_active_staff)
-) -> Any:
+):
     """
     Deactivate a room (staff only)
     """
@@ -262,7 +262,7 @@ def deactivate_room(
     upcoming = db.query(Reservation).filter(
         Reservation.room_id == room_id,
         Reservation.status.in_(["confirmed", "checked_in"]),
-        Reservation.check_out > datetime.utcnow()
+        Reservation.check_out > datetime.now(timezone.utc)
     ).first()
     
     if upcoming:
