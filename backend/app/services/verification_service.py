@@ -1,6 +1,6 @@
 # backend/app/services/verification_service.py
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, Optional
 
 from sqlalchemy.orm import Session
@@ -40,7 +40,7 @@ def verify_key_access(
     key = db.query(DigitalKey).filter(DigitalKey.key_uuid == key_uuid).first()
     
     # Create event record
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     event = None
     
     if key:
@@ -177,7 +177,7 @@ def log_key_usage(
             key_id=key_id,
             event_type=event_type,
             device_info=device_info,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             location=location,
             status=status,
             details=details
