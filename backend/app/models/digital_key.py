@@ -2,7 +2,7 @@
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Enum, Integer
 from sqlalchemy.orm import relationship
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.models.base import BaseModel
 
@@ -44,7 +44,7 @@ class DigitalKey(BaseModel):
     
     def is_valid(self):
         """Check if key is currently valid"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return (
             self.is_active and
             self.status in [KeyStatus.CREATED, KeyStatus.ACTIVE] and

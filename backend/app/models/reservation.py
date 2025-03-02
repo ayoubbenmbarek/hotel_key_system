@@ -2,7 +2,7 @@
 from sqlalchemy import Column, String, DateTime, ForeignKey, Enum, Integer
 from sqlalchemy.orm import relationship
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.models.base import BaseModel
 
@@ -39,7 +39,7 @@ class Reservation(BaseModel):
     
     def is_active(self):
         """Check if reservation is currently active"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return (
             self.status in [ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN] and
             self.check_in <= now <= self.check_out

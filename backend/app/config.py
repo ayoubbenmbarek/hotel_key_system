@@ -26,6 +26,7 @@ def get_env(name, default=None):
 class Settings(BaseSettings):
     API_V1_STR: str = get_env("API_V1_STR", "/api/v1")
     SECRET_KEY: str = get_env("SECRET_KEY", secrets.token_urlsafe(32))
+    APPLE_PUSH_KEY_PATH: str = get_env("APPLE_PUSH_KEY_PATH", "apple_push_key_path")
 
     # Set a default value directly as an integer
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 11520  # 8 days
@@ -73,8 +74,8 @@ class Settings(BaseSettings):
     EMAILS_FROM_NAME: Optional[str] = get_env("EMAILS_FROM_NAME", "Hotel Key System")
     
     # Wallet pass settings
-    APPLE_PASS_TYPE_ID: str = get_env("APPLE_PASS_TYPE_ID", "pass.com.yourhotel.key")
-    APPLE_TEAM_ID: str = get_env("APPLE_TEAM_ID", "1234567890")
+    APPLE_PASS_TYPE_ID: str = get_env("APPLE_PASS_TYPE_ID", "pass.com.azaynohotel.nfc")
+    APPLE_TEAM_ID: str = get_env("APPLE_TEAM_ID", "5CADJ27PT5")
     APPLE_CERT_PATH: str = get_env("APPLE_CERT_PATH", "./certificates/apple/cert.pem")
     APPLE_KEY_PATH: str = get_env("APPLE_KEY_PATH", "./certificates/apple/key.pem")
     APPLE_WWDR_PATH: str = get_env("APPLE_WWDR_PATH", "./certificates/apple/wwdr.pem")
@@ -83,13 +84,13 @@ class Settings(BaseSettings):
     GOOGLE_SERVICE_ACCOUNT_PATH: str = get_env("GOOGLE_SERVICE_ACCOUNT_PATH", "./certificates/google/service_account.json")
     
     # Application info
-    HOTEL_NAME: str = get_env("HOTEL_NAME", "Your Hotel")
-    HOTEL_LOGO_URL: str = get_env("HOTEL_LOGO_URL", "https://your-hotel.com/logo.png")
-    HOTEL_ICON_URL: str = get_env("HOTEL_ICON_URL", "https://your-hotel.com/icon.png")
+    HOTEL_NAME: str = get_env("HOTEL_NAME", "Palacio Holding Mbarek")
+    HOTEL_LOGO_URL: str = get_env("HOTEL_LOGO_URL", "./static/images/hotel_logo.png")
+    HOTEL_ICON_URL: str = get_env("HOTEL_ICON_URL", "./static/images/hotel_icon.png")
     
     # Frontend URLs
     FRONTEND_URL: str = get_env("FRONTEND_URL", "http://localhost:3000")
-    PASS_BASE_URL: str = get_env("PASS_BASE_URL", "https://passes.your-hotel.com")
+    PASS_BASE_URL: str = get_env("PASS_BASE_URL", "http://localhost:8000/api/v1/passes")
     
     model_config = SettingsConfigDict(
         env_file=".env",
