@@ -53,7 +53,7 @@
 
 
 # backend/app/api/auth.py
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
@@ -75,7 +75,7 @@ router = APIRouter()
 
 @router.post("/login", response_model=Token)
 def login_access_token(
-    db: Session = Depends(get_db), 
+    db: Session = Depends(get_db),
     form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
     """
@@ -110,13 +110,13 @@ def login_access_token(
     }
 
 
-@router.post("/register", response_model=User)
+@router.post("/register", response_model=UserSchema)  # Change User to UserSchema
 def register_user(
     *,
     db: Session = Depends(get_db),
     user_in: UserCreate,
     background_tasks: BackgroundTasks
-) -> Any:
+):  # Remove -> Any return type annotation
     """
     Register a new user
     """
@@ -210,7 +210,7 @@ def reset_password(
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         token_data = TokenPayload(**payload)
         
-        if datetime.fromtimestamp(token_data.exp) < datetime.utcnow():
+        if datetime.fromtimestamp(token_data.exp) < datetime.now(timezone.utc):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Token has expired"
