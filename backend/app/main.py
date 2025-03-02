@@ -1,4 +1,5 @@
 # backend/app/main.py
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +12,13 @@ from app.api.router import api_router
 from app.config import settings
 from app.db.session import engine
 from app.models.base import Base
+
+
+# Get the directory where the main.py file is located
+base_dir = os.path.dirname(os.path.abspath(__file__))
+log_dir = os.path.join(base_dir, "..", "logs")
+os.makedirs(log_dir, exist_ok=True)
+
 
 # Configure logging
 logging_config = {
@@ -31,7 +39,7 @@ logging_config = {
             "class": "logging.handlers.RotatingFileHandler",
             "level": "INFO",
             "formatter": "default",
-            "filename": "backend/logs/app.log",
+            "filename": os.path.join(log_dir, "app.log"),
             "maxBytes": 10485760,  # 10 MB
             "backupCount": 5,
         },
@@ -100,6 +108,9 @@ def get_application():
     app = FastAPI(
         title="Hotel Virtual Key API",
         description="API for managing hotel virtual keys",
+        docs_url="/api/v1/docs",
+        # Also update the redoc URL for consistency
+        redoc_url="/api/v1/redoc",
         version="1.0.0",
         lifespan=lifespan,  # Use the new lifespan handler
     )
