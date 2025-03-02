@@ -1,7 +1,7 @@
 # backend/app/api/keys.py
 from typing import Any, List
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session
@@ -21,6 +21,7 @@ from app.schemas.digital_key import (
 )
 from app.services.email_service import send_key_email
 from app.services.wallet_service import create_wallet_pass
+from app.services.pass_update_service import update_wallet_pass_status
 
 router = APIRouter()
 
@@ -68,7 +69,7 @@ def create_digital_key(
     
     # Generate unique key UUID
     key_uuid = str(uuid.uuid4())
-    
+
     # Create pass data for wallet pass
     pass_data = {
         "key_uuid": key_uuid,
@@ -79,7 +80,7 @@ def create_digital_key(
         "check_out": reservation.check_out.isoformat(),
         "nfc_lock_id": room.nfc_lock_id
     }
-    
+
     # Create wallet pass
     try:
         pass_url = create_wallet_pass(pass_data, key_in.pass_type)
@@ -258,7 +259,8 @@ def activate_key(
     *,
     db: Session = Depends(get_db),
     key_id: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    background_tasks: BackgroundTasks  # Add this parameter
 ) -> Any:
     """
     Activate a digital key
@@ -284,7 +286,7 @@ def activate_key(
     # Activate the key
     key.is_active = True
     key.status = KeyStatus.ACTIVE
-    key.activated_at = datetime.utcnow()
+    key.activated_at = datetime.now(timezone.utc)
     
     db.add(key)
     db.commit()
@@ -301,6 +303,14 @@ def activate_key(
     db.add(event)
     db.commit()
     
+    # Add this: Update the pass in real-time
+    background_tasks.add_task(
+        update_wallet_pass_status,
+        db,
+        key.id,
+        is_active=True
+    )
+    
     return key
 
 
@@ -309,7 +319,8 @@ def deactivate_key(
     *,
     db: Session = Depends(get_db),
     key_id: str,
-    current_user: User = Depends(get_current_active_staff)
+    current_user: User = Depends(get_current_active_staff),
+    background_tasks: BackgroundTasks  # Add this parameter
 ) -> Any:
     """
     Deactivate a digital key (staff only)
@@ -338,6 +349,14 @@ def deactivate_key(
     )
     db.add(event)
     db.commit()
+    
+    # Add this: Update the pass in real-time
+    background_tasks.add_task(
+        update_wallet_pass_status,
+        db,
+        key.id,
+        is_active=False
+    )
     
     return key
 

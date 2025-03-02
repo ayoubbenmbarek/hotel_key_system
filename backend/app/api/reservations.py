@@ -1,7 +1,7 @@
 # backend/app/api/reservations.py
 from typing import Any, List
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -124,7 +124,7 @@ def read_active_reservations(
     
     Staff can see all active reservations, guests can only see their own
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     
     query = db.query(Reservation).filter(
         Reservation.status.in_(["confirmed", "checked_in"]),

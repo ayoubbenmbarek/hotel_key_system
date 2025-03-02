@@ -115,7 +115,7 @@ def delete_hotel(
     db: Session = Depends(get_db),
     hotel_id: str,
     current_user: User = Depends(get_current_active_admin)
-) -> Any:
+):  # Remove the "-> Any" return type annotation
     """
     Deactivate a hotel (admin only)
     """
