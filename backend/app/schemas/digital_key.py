@@ -1,7 +1,7 @@
 # backend/app/schemas/digital_key.py
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.models.digital_key import KeyStatus, KeyType
 
@@ -28,9 +28,9 @@ class DigitalKeyUpdate(BaseModel):
 class KeyExtension(BaseModel):
     new_end_date: datetime
     
-    @validator('new_end_date')
+    @field_validator('new_end_date')
     def validate_end_date(cls, v):
-        if v < datetime.utcnow():
+        if v < datetime.now(timezone.utc):
             raise ValueError('New end date must be in the future')
         return v
 
@@ -50,8 +50,9 @@ class DigitalKeyInDBBase(DigitalKeyBase):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True
+    }
 
 
 # Additional properties to return via API
@@ -92,5 +93,6 @@ class KeyEvent(KeyEventBase):
     id: str
     timestamp: datetime
     
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True
+    }

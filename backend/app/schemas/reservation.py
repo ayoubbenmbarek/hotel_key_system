@@ -44,8 +44,9 @@ class Reservation(ReservationBase):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True
+    }
 
 
 # Properties for simple reservation list
@@ -58,5 +59,6 @@ class ReservationSummary(BaseModel):
     check_out: datetime
     status: ReservationStatus
     
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True
+    }
