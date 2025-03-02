@@ -66,6 +66,7 @@ yarn-error.log
 logs/
 certificates/
 tmp/
+backend/app/static/passes/
 
 # Docker
 .docker/
