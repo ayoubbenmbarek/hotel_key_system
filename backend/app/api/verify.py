@@ -1,6 +1,6 @@
 # backend/app/api/verify.py
 from typing import Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -30,7 +30,7 @@ def verify_key(
     key = db.query(DigitalKey).filter(DigitalKey.key_uuid == verification.key_uuid).first()
     
     # Create event record
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     event = KeyEvent(
         key_id=key.id if key else None,
         event_type="access_attempt",
