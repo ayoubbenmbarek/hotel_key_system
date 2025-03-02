@@ -109,11 +109,18 @@ The {settings.HOTEL_NAME} Team
         msg.attach(qr_image)
         
         # Connect to SMTP server and send email
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-            if settings.SMTP_TLS:
-                server.starttls()
-            if settings.SMTP_USER and settings.SMTP_PASSWORD:
-                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        # with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        #     server.send_message(msg)
+        # In production we will use this
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login("ayoubenmbarek@gmail.com", "uojt dktu yfrw vrdn")
+            server.send_message(msg)
+        # with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        #     if settings.SMTP_TLS:
+        #         server.starttls()
+        #     if settings.SMTP_USER and settings.SMTP_PASSWORD:
+        #         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.send_message(msg)
         
         logger.info(f"Digital key email sent successfully to {recipient_email}")
