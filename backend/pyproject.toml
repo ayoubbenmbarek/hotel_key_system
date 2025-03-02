@@ -2,7 +2,7 @@
 name = "hotel-key-system"
 version = "0.1.0"
 description = "Hotel Virtual Key System"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Your Name ayoubenmbarek@gmail.com"]
 readme = "README.md"
 packages = [{include = "app"}]
 package-mode = false
@@ -18,12 +18,14 @@ alembic = "^1.12.0"
 psycopg2-binary = "^2.9.7"
 python-jose = {extras = ["cryptography"], version = "^3.3.0"}
 passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+bcrypt = "4.0.1"  # Add this line with specific version
 python-multipart = "^0.0.6"
 email-validator = "^2.0.0"
 qrcode = {extras = ["pil"], version = "^7.4.2"}
 jinja2 = "^3.1.2"
 requests = "^2.31.0"
 httpx = "^0.24.1"
+PyJWT = "^2.10.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.1"
