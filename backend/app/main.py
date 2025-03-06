@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from logging.config import dictConfig
+from app.db.session import SessionLocal
 import time
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -77,6 +78,16 @@ def create_tables():
         logger.error(f"Error creating database tables: {e}")
         raise
 
+def startup_event():
+    """Run tasks at application startup"""
+    db = SessionLocal()
+    try:
+        # Update auth tokens for existing keys
+        from app.services.wallet_service import update_auth_tokens_for_existing_keys
+        updated = update_auth_tokens_for_existing_keys(db)
+        logger.info(f"Startup: Updated auth tokens for {updated} keys")
+    finally:
+        db.close()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -90,6 +101,8 @@ async def lifespan(app: FastAPI):
     
     # Create database tables
     create_tables()
+    
+    startup_event()
     
     logger.info("Application startup complete")
     
@@ -137,8 +150,9 @@ def get_application():
     
     return app
 
-
 app = get_application()
+
+# app.add_event_handler("startup", startup_event)
 
 if __name__ == "__main__":
     import uvicorn

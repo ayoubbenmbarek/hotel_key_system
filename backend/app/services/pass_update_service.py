@@ -44,7 +44,7 @@ def update_wallet_pass_status(db: Session, key_id: str, is_active: bool = True):
         
         # Regenerate the pass using existing functions
         if key.pass_type == KeyType.APPLE:
-            create_apple_wallet_pass(pass_data)
+            create_apple_wallet_pass(pass_data, db)
             logger.info(f"Apple Wallet pass updated for key {key_id}")
         elif key.pass_type == KeyType.GOOGLE:
             create_google_wallet_pass(pass_data)

@@ -26,7 +26,10 @@ def get_env(name, default=None):
 class Settings(BaseSettings):
     API_V1_STR: str = get_env("API_V1_STR", "/api/v1")
     SECRET_KEY: str = get_env("SECRET_KEY", secrets.token_urlsafe(32))
-    APPLE_PUSH_KEY_PATH: str = get_env("APPLE_PUSH_KEY_PATH", "apple_push_key_path")
+    APPLE_PUSH_PRIVATE_KEY_PATH: str = get_env("APPLE_PUSH_PRIVATE_KEY_PATH", "./certificates/AuthKey_BA9F84UHXN.p8")
+    APPLE_PUSH_KEY_ID: str = get_env("APPLE_PUSH_KEY_ID", "BA9F84UHXN")
+    PRODUCTION: str = get_env("PRODUCTION", "")
+    ENVIRONMENT: str = get_env("ENVIRONMENT", "development")
 
     # Set a default value directly as an integer
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 11520  # 8 days
@@ -57,7 +60,7 @@ class Settings(BaseSettings):
         if not self.SQLALCHEMY_DATABASE_URI:
             self.SQLALCHEMY_DATABASE_URI = (
                 f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@"
-                f"{self.POSTGRES_SERVER}/{self.POSTGRES_DB}"
+                f"{self.POSTGRES_SERVER}:5432/{self.POSTGRES_DB}"
             )
         return self
     
@@ -90,7 +93,7 @@ class Settings(BaseSettings):
     
     # Frontend URLs
     FRONTEND_URL: str = get_env("FRONTEND_URL", "http://localhost:3000")
-    PASS_BASE_URL: str = get_env("PASS_BASE_URL", "http://localhost:8000/api/v1/passes")
+    PASS_BASE_URL: str = get_env("PASS_BASE_URL", "https://5a68-2a01-e0a-159-2b50-5c47-ed09-6b4d-d45f.ngrok-free.app/api/v1/passes")
     
     model_config = SettingsConfigDict(
         env_file=".env",

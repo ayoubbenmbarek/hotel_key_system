@@ -86,7 +86,8 @@ def create_digital_key(
             valid_from=reservation.check_in,
             valid_until=reservation.check_out,
             is_active=True,
-            status=KeyStatus.CREATED
+            status=KeyStatus.CREATED,
+            auth_token=key_uuid
         )
         
         db.add(digital_key)
@@ -217,63 +218,137 @@ def deactivate_key(db: Session, key_id: str) -> DigitalKey:
         raise ValueError(f"Error deactivating key: {str(e)}")
 
 
-def extend_key_validity(db: Session, key_id: str, new_end_date: datetime) -> DigitalKey:
-    """
-    Extend the validity period of a digital key
+# def extend_key_validity(db: Session, key_id: str, new_end_date: datetime) -> DigitalKey:
+#     """
+#     Extend the validity period of a digital key
     
-    Args:
-        db: Database session
-        key_id: Key ID
-        new_end_date: New end date for the key
+#     Args:
+#         db: Database session
+#         key_id: Key ID
+#         new_end_date: New end date for the key
+    
+#     Returns:
+#         Updated DigitalKey object
+    
+#     Raises:
+#         ValueError: If key not found or new date is invalid
+#     """
+#     try:
+#         key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
+#         if not key:
+#             raise ValueError("Digital key not found")
+        
+#         # Validate new end date
+#         if new_end_date <= key.valid_from:
+#             raise ValueError("New end date must be after the start date")
+        
+#         if new_end_date <= datetime.now(timezone.utc):
+#             raise ValueError("New end date must be in the future")
+        
+#         # Update key validity
+#         key.valid_until = new_end_date
+        
+#         # Also update the reservation check-out date
+#         reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
+#         if reservation:
+#             reservation.check_out = new_end_date
+#             db.add(reservation)
+        
+#         # Log extension
+#         event = KeyEvent(
+#             key_id=key.id,
+#             event_type="key_extended",
+#             timestamp=datetime.now(timezone.utc),
+#             status="success",
+#             details=f"Extended until: {new_end_date.isoformat()}"
+#         )
+        
+#         db.add(key)
+#         db.add(event)
+#         db.commit()
+#         db.refresh(key)
+        
+#         return key
+    
+#     except Exception as e:
+#         db.rollback()
+#         logger.error(f"Error extending key validity: {str(e)}")
+#         raise ValueError(f"Error extending key validity: {str(e)}")
+
+def update_checkout_date(serial_number, new_checkout_date, db):
+    """
+    Update the checkout date for a digital key and its associated reservation
+    
+    Parameters:
+    serial_number (str): The key_uuid of the digital key to update
+    new_checkout_date (datetime): The new checkout date
+    db (Session): Database session
     
     Returns:
-        Updated DigitalKey object
-    
-    Raises:
-        ValueError: If key not found or new date is invalid
+    dict: Updated pass data or None if key not found
     """
     try:
-        key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
-        if not key:
-            raise ValueError("Digital key not found")
+        # Find the digital key by key_uuid
+        digital_key = db.query(DigitalKey).filter(
+            DigitalKey.key_uuid == serial_number
+        ).first()
         
-        # Validate new end date
-        if new_end_date <= key.valid_from:
-            raise ValueError("New end date must be after the start date")
+        if not digital_key:
+            logger.error(f"Digital key not found with serial number: {serial_number}")
+            return None
         
-        if new_end_date <= datetime.now(timezone.utc):
-            raise ValueError("New end date must be in the future")
+        # Update the key's valid_until date
+        digital_key.valid_until = new_checkout_date
         
-        # Update key validity
-        key.valid_until = new_end_date
+        # Update the associated reservation's checkout date
+        reservation = db.query(Reservation).filter(
+            Reservation.id == digital_key.reservation_id
+        ).first()
         
-        # Also update the reservation check-out date
-        reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
         if reservation:
-            reservation.check_out = new_end_date
+            reservation.check_out = new_checkout_date
+            logger.info(f"Updated reservation checkout date for reservation ID: {reservation.id}")
+        else:
+            logger.warning(f"Reservation not found for digital key: {serial_number}")
+        
+        # Update the key's timestamp to trigger update detection
+        digital_key.updated_at = datetime.now(timezone.utc)
+        
+        # Commit changes to database
+        db.add(digital_key)
+        if reservation:
             db.add(reservation)
-        
-        # Log extension
-        event = KeyEvent(
-            key_id=key.id,
-            event_type="key_extended",
-            timestamp=datetime.now(timezone.utc),
-            status="success",
-            details=f"Extended until: {new_end_date.isoformat()}"
-        )
-        
-        db.add(key)
-        db.add(event)
         db.commit()
-        db.refresh(key)
         
-        return key
-    
+        # Refresh the key to get updated data
+        db.refresh(digital_key)
+        
+        # Get all necessary data for pass update
+        room = None
+        user = None
+        
+        if reservation:
+            room = db.query(Room).filter(Room.id == reservation.room_id).first()
+            user = db.query(User).filter(User.id == reservation.user_id).first()
+        
+        # Prepare pass data
+        pass_data = {
+            "key_uuid": digital_key.key_uuid,
+            "room_number": room.room_number if room else "N/A",
+            "guest_name": f"{user.first_name} {user.last_name}" if user else "Guest",
+            "check_in": reservation.check_in.isoformat() if reservation else digital_key.valid_from.isoformat(),
+            "check_out": reservation.check_out.isoformat() if reservation else digital_key.valid_until.isoformat(),
+            "nfc_lock_id": room.nfc_lock_id if room else None,
+            "is_active": digital_key.is_active
+        }
+        
+        logger.info(f"Successfully updated checkout date for key: {serial_number}")
+        return pass_data
+        
     except Exception as e:
+        logger.error(f"Error updating checkout date: {str(e)}")
         db.rollback()
-        logger.error(f"Error extending key validity: {str(e)}")
-        raise ValueError(f"Error extending key validity: {str(e)}")
-
+        return None
 
 def get_user_keys(db: Session, user_id: str) -> List[DigitalKey]:
     """

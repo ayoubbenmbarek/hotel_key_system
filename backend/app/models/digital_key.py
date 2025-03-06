@@ -23,6 +23,9 @@ class DigitalKey(BaseModel):
     """
     Digital Key model for virtual room keys
     """
+    __tablename__ = "digitalkey"
+    
+    # Your existing columns
     reservation_id = Column(String, ForeignKey("reservation.id"), nullable=False)
     key_uuid = Column(String, unique=True, index=True, nullable=False)
     pass_url = Column(String)
@@ -34,10 +37,13 @@ class DigitalKey(BaseModel):
     activated_at = Column(DateTime)
     last_used = Column(DateTime)
     access_count = Column(Integer, default=0)
+    auth_token = Column(String)
+    # auth_token = Column(String, nullable=True) TODO: check if migration needed if we change this
     
     # Relationships
     reservation = relationship("Reservation", back_populates="digital_keys")
     events = relationship("KeyEvent", back_populates="digital_key")
+    device_registrations = relationship("DeviceRegistration", back_populates="digital_key", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<DigitalKey {self.key_uuid}>"
