@@ -23,7 +23,7 @@ services:
       - EMAILS_FROM_EMAIL=ayoubenmbarek@gmail.com
       - EMAILS_FROM_NAME=Your Hotel
       - FRONTEND_URL=http://localhost:3000
-      - PASS_BASE_URL=http://localhost:8000/api/v1/passes
+      - PASS_BASE_URL=https://5a68-2a01-e0a-159-2b50-5c47-ed09-6b4d-d45f.ngrok-free.app/api/v1/passes
     depends_on:
       - db
       - mailhog
@@ -41,7 +41,7 @@ services:
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=hotel_keys
     ports:
-      - "5432:5432"
+      - "5432:5432" # Update posrt to avoid conflict with local postgresl db
     networks:
       - hotel_network
     restart: always
@@ -67,7 +67,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - REACT_APP_API_URL=http://localhost:8000/api/v1
+      - REACT_APP_API_URL=https://5a68-2a01-e0a-159-2b50-5c47-ed09-6b4d-d45f.ngrok-free.app/api/v1
     depends_on:
       - backend
     networks:
