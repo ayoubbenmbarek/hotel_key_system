@@ -28,7 +28,7 @@ The system consists of the following components:
 ### Prerequisites
 
 - Docker and Docker Compose
-- Python 3.10+
+- Python 3.11+
 - Node.js 16+ (for frontend)
 
 ### Installation

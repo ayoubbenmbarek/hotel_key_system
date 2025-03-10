@@ -55,6 +55,6 @@ else
 fi
 
 echo "System is ready!"
-echo "Access the API at: http://localhost:8000/api/v1/docs"
+echo "Access the API at: https://5a68-2a01-e0a-159-2b50-5c47-ed09-6b4d-d45f.ngrok-free.app/api/v1/docs"
 echo "Access email testing at: http://localhost:8025"
 echo "Access database admin at: http://localhost:8080 (postgres/password)"

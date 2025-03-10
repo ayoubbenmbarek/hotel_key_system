@@ -24,7 +24,6 @@ from app.schemas.digital_key import (
     KeyEvent as KeyEventSchema
 )
 from app.services.email_service import send_key_email
-from app.services.wallet_service import create_wallet_pass
 from app.services.pass_update_service import update_wallet_pass_status
 
 # Configure logging
@@ -483,3 +482,7 @@ def read_key_events(
     ).offset(skip).limit(limit).all()
     
     return events
+
+
+# TODO: maybe invoke functions in key_service that
+# do not exists here to create endpoints, like get_key_details, get_key_usage_history etc

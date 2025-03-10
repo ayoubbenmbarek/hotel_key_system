@@ -67,6 +67,8 @@ logs/
 certificates/
 tmp/
 backend/app/static/passes/
+.hotel_env/
+notes
 
 # Docker
 .docker/

@@ -3,23 +3,25 @@ import json
 import logging
 from pathlib import Path
 from sqlalchemy.orm import Session
-from fastapi import Depends
 import jwt
+from app.db.session import SessionLocal
 import time
 from datetime import datetime, timezone
 import http.client
 import uuid
+import httpx
 
 from app.config import settings
 from app.db.session import get_db
 from app.models.device import DeviceRegistration
-from app.models.digital_key import DigitalKey
+from app.models.digital_key import DigitalKey, KeyEvent
 
 
 logger = logging.getLogger(__name__)
 
 device_registrations = {}
 
+# TODO: try to load env for production=True from .env
 SERVER = "api.push.apple.com" if settings.PRODUCTION else "api.development.push.apple.com"
 logger.info(f"Using APNs server: {SERVER}")
 # CONN = http.client.HTTPSConnection(SERVER)
@@ -151,20 +153,16 @@ def has_pass_been_updated(digital_key, last_updated_str):
         return True
 
 
-def send_push_notifications_production(pass_type_id, serial_number,
-                                    #    db=None
-                                       db: Session = Depends(get_db), # I added get_db to test
-                                       ):
+def send_push_notifications_production(pass_type_id, serial_number, db=None):
     """Send push notifications to all devices registered for a pass (production)"""
     logger.info(f"Sending production push notifications for pass: {pass_type_id}:{serial_number}")
     
     # Get DB session if not provided
-    # if db is None:
-    #     from app.db.session import SessionLocal
-    #     db = SessionLocal()
-    #     close_db = True
-    # else:
-    #     close_db = False # I commented this to test
+    close_db = False
+    if db is None:
+        from app.db.session import SessionLocal
+        db = SessionLocal()
+        close_db = True
     
     try:
         # Get all registered devices
@@ -178,67 +176,107 @@ def send_push_notifications_production(pass_type_id, serial_number,
             logger.warning(f"No registered devices found for pass: {serial_number}")
             return 0
         
-        # Setup APNs connection based on environment
-        server = "api.push.apple.com" if settings.PRODUCTION else "api.development.push.apple.com"
-        conn = http.client.HTTPSConnection(server)
-        
-        # Create JWT token
-        token = create_apns_token(
-            team_id=settings.APPLE_TEAM_ID,
-            key_id=settings.APPLE_PUSH_KEY_ID,
-            private_key_path=settings.APPLE_PUSH_PRIVATE_KEY_PATH
-        )
-        
-        # Track successful push notifications
-        success_count = 0
-        
-        # Send push to each device
-        for registration in registrations:
-            try:
-                device_token = registration.push_token
-                
-                # Set up headers
-                headers = {
-                    "authorization": f"bearer {token}",
-                    "apns-topic": f"pass.{pass_type_id}",
-                    "apns-push-type": "background",
-                    "apns-priority": "10"
-                }
-                
-                # Empty payload for pass updates
-                payload = json.dumps({"aps": {}})
-                
-                # Send the request
-                conn.request("POST", f"/3/device/{device_token}", payload, headers)
-                response = conn.getresponse()
-                result = response.read().decode()
-                
-                # Log response
-                if response.status == 200:
-                    logger.info(f"Push notification sent successfully to device: {registration.device_library_id}")
-                    success_count += 1
-                else:
-                    logger.error(f"Failed to send push notification: {response.status} - {result}")
+        try:            
+            # Create JWT token
+            token = create_apns_token(
+                team_id=settings.APPLE_TEAM_ID,
+                key_id=settings.APPLE_PUSH_KEY_ID,
+                private_key_path=settings.APPLE_PUSH_PRIVATE_KEY_PATH
+            )
+            
+            # Setup APNs connection
+            # to try found in official docs: "api.sandbox.push.apple.com" "api.development.push.apple.com"
+            # server = "api.push.apple.com" if settings.PRODUCTION else "api.development.push.apple.com"
+            print("server:", SERVER)
+            base_url = f"https://{SERVER}/3/device/"
+            
+            # Track successful push notifications
+            success_count = 0
+            
+            # Use httpx with HTTP/2
+            with httpx.Client(http2=True) as client:
+                for registration in registrations:
+                    try:
+                        device_token = registration.push_token
+                        
+                        # Set up headers
+                        headers = {
+                            "authorization": f"bearer {token}",
+                            "apns-topic": settings.APPLE_PASS_TYPE_ID,
+                            "apns-push-type": "background",
+                            "apns-priority": "10"
+                        }
+                        
+                        # Empty payload for pass updates
+                        payload = {"aps": {}}
+                        
+                        # Send the request
+                        url = base_url + device_token
+                        response = client.post(url, json=payload, headers=headers)
+                        
+                        # Log response
+                        if response.status_code == 200:
+                            logger.info(f"Push notification sent successfully to device: {registration.device_library_id}")
+                            success_count += 1
+                            
+                            # Create success event
+                            key_event = KeyEvent(
+                                key_id=registration.digital_key_id,
+                                event_type="push_notification_sent",
+                                device_info=f"Device: {registration.device_library_id}",
+                                status="success",
+                                details="Push notification sent successfully"
+                            )
+                            db.add(key_event)
+                            db.commit()
+                        else:
+                            logger.error(f"Failed to send push notification: {response.status_code} - {response.text}")
+                            
+                            # Create failure event
+                            key_event = KeyEvent(
+                                key_id=registration.digital_key_id,
+                                event_type="push_notification_failed",
+                                device_info=f"Device: {registration.device_library_id}",
+                                status="error",
+                                details=f"Status: {response.status_code}, Response: {response.text}"
+                            )
+                            db.add(key_event)
+                            db.commit()
+                            
+                            # Handle token expiration
+                            if response.status_code == 410:  # Gone - token is no longer valid
+                                registration.active = False
+                                db.commit()
+                                logger.info(f"Marked registration as inactive due to invalid token: {registration.device_library_id}")
                     
-                    # Handle token expiration or other errors
-                    if response.status == 410:  # Gone - token is no longer valid
-                        registration.active = False
-                        db.commit()
-                        logger.info(f"Marked registration as inactive due to invalid token: {registration.device_library_id}")
-                
-            except Exception as e:
-                logger.error(f"Error sending push notification: {str(e)}")
+                    except Exception as e:
+                        logger.error(f"Error sending push notification: {str(e)}")
+                        
+                        # Create error event
+                        try:
+                            key_event = KeyEvent(
+                                key_id=registration.digital_key_id,
+                                event_type="push_notification_error",
+                                device_info=f"Device: {registration.device_library_id}",
+                                status="error",
+                                details=f"Error: {str(e)}"
+                            )
+                            db.add(key_event)
+                            db.commit()
+                        except Exception as event_error:
+                            logger.error(f"Failed to create error event: {str(event_error)}")
+            
+            logger.info(f"Push notifications completed: {success_count} successful out of {len(registrations)}")
+            return success_count
         
-        conn.close()
-        logger.info(f"Push notifications sent successfully: {success_count} out of {len(registrations)}")
-        return success_count
-        
+        except Exception as e:
+            logger.error(f"Fatal error in push notification service: {str(e)}")
+            return 0
+            
     finally:
         # Close DB session if we created it
-        pass
-        # if close_db:
-        #     db.close()
-
+        if close_db:
+            db.close()
 
 def save_auth_token_to_db(serial_number, auth_token, db):
     """Store authentication token for a digital key"""

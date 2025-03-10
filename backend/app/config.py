@@ -26,9 +26,9 @@ def get_env(name, default=None):
 class Settings(BaseSettings):
     API_V1_STR: str = get_env("API_V1_STR", "/api/v1")
     SECRET_KEY: str = get_env("SECRET_KEY", secrets.token_urlsafe(32))
-    APPLE_PUSH_PRIVATE_KEY_PATH: str = get_env("APPLE_PUSH_PRIVATE_KEY_PATH", "./certificates/AuthKey_BA9F84UHXN.p8")
+    APPLE_PUSH_PRIVATE_KEY_PATH: str = get_env("APPLE_PUSH_PRIVATE_KEY_PATH", "./certificates/apple/AuthKey_BA9F84UHXN.p8")
     APPLE_PUSH_KEY_ID: str = get_env("APPLE_PUSH_KEY_ID", "BA9F84UHXN")
-    PRODUCTION: str = get_env("PRODUCTION", "")
+    PRODUCTION: str = get_env("PRODUCTION", "True")
     ENVIRONMENT: str = get_env("ENVIRONMENT", "development")
 
     # Set a default value directly as an integer
@@ -88,8 +88,8 @@ class Settings(BaseSettings):
     
     # Application info
     HOTEL_NAME: str = get_env("HOTEL_NAME", "Palacio Holding Mbarek")
-    HOTEL_LOGO_URL: str = get_env("HOTEL_LOGO_URL", "./static/images/hotel_logo.png")
-    HOTEL_ICON_URL: str = get_env("HOTEL_ICON_URL", "./static/images/hotel_icon.png")
+    HOTEL_LOGO_URL: str = get_env("HOTEL_LOGO_URL", "/static/images/hotel_logo.png")
+    HOTEL_ICON_URL: str = get_env("HOTEL_ICON_URL", "/static/images/hotel_icon.png")
     
     # Frontend URLs
     FRONTEND_URL: str = get_env("FRONTEND_URL", "http://localhost:3000")
