@@ -93,7 +93,7 @@ class Settings(BaseSettings):
     
     # Frontend URLs
     FRONTEND_URL: str = get_env("FRONTEND_URL", "http://localhost:3000")
-    PASS_BASE_URL: str = get_env("PASS_BASE_URL", "https://5a68-2a01-e0a-159-2b50-5c47-ed09-6b4d-d45f.ngrok-free.app/api/v1/passes")
+    PASS_BASE_URL: str = get_env("PASS_BASE_URL", "https://2e24-2a01-e0a-159-2b50-b46f-2afb-eef3-7ede.ngrok-free.app/api/v1/passes")
     
     model_config = SettingsConfigDict(
         env_file=".env",
