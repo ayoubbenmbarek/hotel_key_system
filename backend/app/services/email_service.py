@@ -81,23 +81,23 @@ def send_key_email(recipient_email, guest_name, pass_url, key_id, pass_data):
         
         # Create plain text version
         text_content = f"""
-Welcome to {settings.HOTEL_NAME}!
+            Welcome to {settings.HOTEL_NAME}!
 
-Hello {guest_name},
+            Hello {guest_name},
 
-Your digital room key is ready. Here are your reservation details:
+            Your digital room key is ready. Here are your reservation details:
 
-Room: {pass_data["room_number"]}
-Check-in: {format_datetime(pass_data["check_in"])}
-Check-out: {format_datetime(pass_data["check_out"])}
+            Room: {pass_data["room_number"]}
+            Check-in: {format_datetime(pass_data["check_in"])}
+            Check-out: {format_datetime(pass_data["check_out"])}
 
-To add your key to your wallet, visit: {pass_url}
+            To add your key to your wallet, visit: {pass_url}
 
-We hope you enjoy your stay!
+            We hope you enjoy your stay!
 
-Best regards,
-The {settings.HOTEL_NAME} Team
-        """
+            Best regards,
+            The {settings.HOTEL_NAME} Team
+                    """
         
         # Attach text and HTML versions
         msg_alternative.attach(MIMEText(text_content, 'plain'))
@@ -121,7 +121,7 @@ The {settings.HOTEL_NAME} Team
         #         server.starttls()
         #     if settings.SMTP_USER and settings.SMTP_PASSWORD:
         #         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.send_message(msg)
+            # server.send_message(msg)
         
         logger.info(f"Digital key email sent successfully to {recipient_email}")
         return True

@@ -21,7 +21,6 @@ log_dir = os.path.join(base_dir, "..", "logs")
 os.makedirs(log_dir, exist_ok=True)
 
 
-# Configure logging
 logging_config = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -46,10 +45,14 @@ logging_config = {
         },
     },
     "loggers": {
-        "app": {"handlers": ["console", "file"], "level": "INFO"},
-        "uvicorn": {"handlers": ["console", "file"], "level": "INFO"},
+        # Set propagate=False for app and its subloggers
+        "app": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
+        "app.api": {"level": "INFO", "propagate": True},  # Will inherit from "app"
+        "app.services": {"level": "INFO", "propagate": True},  # Will inherit from "app"
+        "uvicorn": {"handlers": ["console", "file"], "level": "INFO", "propagate": False},
     },
-    "root": {"handlers": ["console", "file"], "level": "INFO"},
+    # Root logger has no handlers - messages propagate up to their parent loggers
+    "root": {"level": "INFO"},
 }
 
 dictConfig(logging_config)

@@ -16,114 +16,114 @@ from app.services.email_service import send_key_email
 logger = logging.getLogger(__name__)
 
 
-def create_digital_key(
-    db: Session,
-    reservation_id: str,
-    pass_type: KeyType,
-    send_email: bool = True
-) -> Tuple[DigitalKey, str]:
-    """
-    Create a new digital key for a reservation
+# def create_digital_key(
+#     db: Session,
+#     reservation_id: str,
+#     pass_type: KeyType,
+#     send_email: bool = True
+# ) -> Tuple[DigitalKey, str]:
+#     """
+#     Create a new digital key for a reservation
     
-    Args:
-        db: Database session
-        reservation_id: Reservation ID
-        pass_type: Type of wallet pass (apple, google)
-        send_email: Whether to send the key via email
+#     Args:
+#         db: Database session
+#         reservation_id: Reservation ID
+#         pass_type: Type of wallet pass (apple, google)
+#         send_email: Whether to send the key via email
     
-    Returns:
-        Tuple of (DigitalKey object, pass_url)
+#     Returns:
+#         Tuple of (DigitalKey object, pass_url)
     
-    Raises:
-        ValueError: If reservation is invalid or issues with creating the key
-    """
-    try:
-        # Check if reservation exists
-        reservation = db.query(Reservation).filter(Reservation.id == reservation_id).first()
-        if not reservation:
-            raise ValueError("Reservation not found")
+#     Raises:
+#         ValueError: If reservation is invalid or issues with creating the key
+#     """
+#     try:
+#         # Check if reservation exists
+#         reservation = db.query(Reservation).filter(Reservation.id == reservation_id).first()
+#         if not reservation:
+#             raise ValueError("Reservation not found")
         
-        # Verify reservation status
-        if reservation.status not in [ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN]:
-            raise ValueError(f"Cannot create key for reservation with status: {reservation.status}")
+#         # Verify reservation status
+#         if reservation.status not in [ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN]:
+#             raise ValueError(f"Cannot create key for reservation with status: {reservation.status}")
         
-        # Get user and room info
-        user = db.query(User).filter(User.id == reservation.user_id).first()
-        if not user:
-            raise ValueError("User not found")
+#         # Get user and room info
+#         user = db.query(User).filter(User.id == reservation.user_id).first()
+#         if not user:
+#             raise ValueError("User not found")
         
-        room = db.query(Room).filter(Room.id == reservation.room_id).first()
-        if not room:
-            raise ValueError("Room not found")
+#         room = db.query(Room).filter(Room.id == reservation.room_id).first()
+#         if not room:
+#             raise ValueError("Room not found")
         
-        # Generate unique key UUID
-        key_uuid = str(uuid.uuid4())
+#         # Generate unique key UUID
+#         key_uuid = str(uuid.uuid4())
         
-        # Create pass data for wallet pass
-        pass_data = {
-            "key_uuid": key_uuid,
-            "hotel_name": db.query(Room).join(Room.hotel).filter(Room.id == reservation.room_id).first().hotel.name,
-            "room_number": room.room_number,
-            "guest_name": f"{user.first_name} {user.last_name}",
-            "check_in": reservation.check_in.isoformat(),
-            "check_out": reservation.check_out.isoformat(),
-            "nfc_lock_id": room.nfc_lock_id
-        }
+#         # Create pass data for wallet pass
+#         pass_data = {
+#             "key_uuid": key_uuid,
+#             "hotel_name": db.query(Room).join(Room.hotel).filter(Room.id == reservation.room_id).first().hotel.name,
+#             "room_number": room.room_number,
+#             "guest_name": f"{user.first_name} {user.last_name}",
+#             "check_in": reservation.check_in.isoformat(),
+#             "check_out": reservation.check_out.isoformat(),
+#             "nfc_lock_id": room.nfc_lock_id
+#         }
         
-        # Create wallet pass
-        try:
-            pass_url = create_wallet_pass(pass_data, pass_type)
-        except Exception as e:
-            logger.error(f"Error creating wallet pass: {str(e)}")
-            raise ValueError(f"Error creating wallet pass: {str(e)}")
+#         # Create wallet pass
+#         try:
+#             pass_url = create_wallet_pass(pass_data, pass_type)
+#         except Exception as e:
+#             logger.error(f"Error creating wallet pass: {str(e)}")
+#             raise ValueError(f"Error creating wallet pass: {str(e)}")
         
-        # Create digital key record
-        digital_key = DigitalKey(
-            reservation_id=reservation_id,
-            key_uuid=key_uuid,
-            pass_url=pass_url,
-            pass_type=pass_type,
-            valid_from=reservation.check_in,
-            valid_until=reservation.check_out,
-            is_active=True,
-            status=KeyStatus.CREATED,
-            auth_token=key_uuid
-        )
+#         # Create digital key record
+#         digital_key = DigitalKey(
+#             reservation_id=reservation_id,
+#             key_uuid=key_uuid,
+#             pass_url=pass_url,
+#             pass_type=pass_type,
+#             valid_from=reservation.check_in,
+#             valid_until=reservation.check_out,
+#             is_active=True,
+#             status=KeyStatus.CREATED,
+#             auth_token=key_uuid
+#         )
         
-        db.add(digital_key)
-        db.commit()
-        db.refresh(digital_key)
+#         db.add(digital_key)
+#         db.commit()
+#         db.refresh(digital_key)
         
-        # Send email if requested
-        if send_email:
-            success = send_key_email(
-                user.email,
-                f"{user.first_name} {user.last_name}",
-                pass_url,
-                digital_key.id,
-                pass_data
-            )
+#         # Send email if requested
+#         if send_email:
+#             success = send_key_email(
+#                 user.email,
+#                 f"{user.first_name} {user.last_name}",
+#                 pass_url,
+#                 digital_key.id,
+#                 pass_data
+#             )
             
-            if not success:
-                logger.warning(f"Failed to send key email to {user.email}")
-                # Don't fail the key creation if email sending fails
+#             if not success:
+#                 logger.warning(f"Failed to send key email to {user.email}")
+#                 # Don't fail the key creation if email sending fails
         
-        # Log key creation
-        event = KeyEvent(
-            key_id=digital_key.id,
-            event_type="key_created",
-            timestamp=datetime.now(timezone.utc),
-            status="success"
-        )
-        db.add(event)
-        db.commit()
+#         # Log key creation
+#         event = KeyEvent(
+#             key_id=digital_key.id,
+#             event_type="key_created",
+#             timestamp=datetime.now(timezone.utc),
+#             status="success"
+#         )
+#         db.add(event)
+#         db.commit()
         
-        return digital_key, pass_url
+#         return digital_key, pass_url
     
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error creating digital key: {str(e)}")
-        raise ValueError(f"Error creating digital key: {str(e)}")
+#     except Exception as e:
+#         db.rollback()
+#         logger.error(f"Error creating digital key: {str(e)}")
+#         raise ValueError(f"Error creating digital key: {str(e)}")
 
 
 def activate_key(db: Session, key_id: str) -> DigitalKey:
@@ -413,53 +413,53 @@ def get_active_keys(db: Session, user_id: Optional[str] = None) -> List[DigitalK
         return []
 
 
-def regenerate_key(db: Session, key_id: str) -> Tuple[DigitalKey, str]:
-    """
-    Regenerate a digital key (create a new one based on existing)
+# def regenerate_key(db: Session, key_id: str) -> Tuple[DigitalKey, str]:
+#     """
+#     Regenerate a digital key (create a new one based on existing)
     
-    Args:
-        db: Database session
-        key_id: Existing key ID
+#     Args:
+#         db: Database session
+#         key_id: Existing key ID
     
-    Returns:
-        Tuple of (DigitalKey object, pass_url)
+#     Returns:
+#         Tuple of (DigitalKey object, pass_url)
     
-    Raises:
-        ValueError: If key not found or issues with creating a new key
-    """
-    try:
-        # Get existing key
-        old_key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
-        if not old_key:
-            raise ValueError("Digital key not found")
+#     Raises:
+#         ValueError: If key not found or issues with creating a new key
+#     """
+#     try:
+#         # Get existing key
+#         old_key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
+#         if not old_key:
+#             raise ValueError("Digital key not found")
         
-        # Deactivate old key
-        old_key.is_active = False
-        old_key.status = KeyStatus.REVOKED
-        db.add(old_key)
+#         # Deactivate old key
+#         old_key.is_active = False
+#         old_key.status = KeyStatus.REVOKED
+#         db.add(old_key)
         
-        # Log deactivation
-        event = KeyEvent(
-            key_id=old_key.id,
-            event_type="key_regenerated",
-            timestamp=datetime.now(timezone.utc),
-            status="success"
-        )
-        db.add(event)
+#         # Log deactivation
+#         event = KeyEvent(
+#             key_id=old_key.id,
+#             event_type="key_regenerated",
+#             timestamp=datetime.now(timezone.utc),
+#             status="success"
+#         )
+#         db.add(event)
         
-        # Create new key based on same reservation
-        new_key, pass_url = create_digital_key(
-            db=db,
-            reservation_id=old_key.reservation_id,
-            pass_type=old_key.pass_type
-        )
+#         # Create new key based on same reservation
+#         new_key, pass_url = create_digital_key(
+#             db=db,
+#             reservation_id=old_key.reservation_id,
+#             pass_type=old_key.pass_type
+#         )
         
-        return new_key, pass_url
+#         return new_key, pass_url
     
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error regenerating key: {str(e)}")
-        raise ValueError(f"Error regenerating key: {str(e)}")
+#     except Exception as e:
+#         db.rollback()
+#         logger.error(f"Error regenerating key: {str(e)}")
+#         raise ValueError(f"Error regenerating key: {str(e)}")
 
 
 def get_expired_keys(db: Session) -> List[DigitalKey]:

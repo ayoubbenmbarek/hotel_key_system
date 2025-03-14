@@ -1,5 +1,5 @@
 # backend/app/api/keys.py
-from typing import Any, List
+from typing import Any, List, Tuple
 import uuid
 import logging
 from datetime import datetime, timezone
@@ -145,6 +145,7 @@ def create_digital_key(
     
     # Send email in background if requested
     if key_in.send_email:
+        logger.info(f"Adding email task for digital key {digital_key.id} to {user.email}")
         background_tasks.add_task(
             send_key_email,
             user.email,
@@ -153,7 +154,7 @@ def create_digital_key(
             digital_key.id,
             pass_data
         )
-    
+
     return digital_key
 
 
@@ -247,6 +248,7 @@ def update_key(
     return key
 
 
+# TODO: add validation for extend_key validity, checkout could not be < checkin date, like reservation i think
 @router.patch("/{key_id}/extend", response_model=DigitalKeySchema)
 def extend_key_validity(
     *,
@@ -318,36 +320,6 @@ def extend_key_validity(
     db.commit()
     
     return key
-
-@router.post("/extend-checkout/{serial_number}")
-async def extend_checkout(
-    serial_number: str,
-    new_checkout: datetime,
-    db: Session = Depends(get_db)
-):
-    """Extend the checkout date for a pass and send push notifications"""
-    # Update pass in database
-    pass_data = update_checkout_date(serial_number, new_checkout, db)
-    
-    if not pass_data:
-        raise HTTPException(status_code=404, detail="Pass not found")
-    
-    # Create new pass file
-    from app.services.wallet_service import create_apple_wallet_pass
-    create_apple_wallet_pass(pass_data, db)
-    
-    # Send push notifications to all registered devices
-    notification_count = send_push_notifications(
-        pass_type_id=settings.APPLE_PASS_TYPE_ID,
-        serial_number=serial_number,
-        db=db
-    )
-    
-    return {
-        "success": True,
-        "message": f"Checkout extended to {new_checkout}",
-        "notifications_sent": notification_count
-    }
 
 
 @router.patch("/{key_id}/activate", response_model=DigitalKeySchema)
@@ -483,6 +455,54 @@ def read_key_events(
     
     return events
 
+# # TODO: add router and test it, copied from key_service
+# def regenerate_key(db: Session, key_id: str) -> Tuple[DigitalKey, str]:
+#     """
+#     Regenerate a digital key (create a new one based on existing)
+    
+#     Args:
+#         db: Database session
+#         key_id: Existing key ID
+    
+#     Returns:
+#         Tuple of (DigitalKey object, pass_url)
+    
+#     Raises:
+#         ValueError: If key not found or issues with creating a new key
+#     """
+#     try:
+#         # Get existing key
+#         old_key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
+#         if not old_key:
+#             raise ValueError("Digital key not found")
+        
+#         # Deactivate old key
+#         old_key.is_active = False
+#         old_key.status = KeyStatus.REVOKED
+#         db.add(old_key)
+        
+#         # Log deactivation
+#         event = KeyEvent(
+#             key_id=old_key.id,
+#             event_type="key_regenerated",
+#             timestamp=datetime.now(timezone.utc),
+#             status="success"
+#         )
+#         db.add(event)
+        
+#         # Create new key based on same reservation
+#         new_key, pass_url = create_digital_key(
+#             db=db,
+#             reservation_id=old_key.reservation_id,
+#             pass_type=old_key.pass_type
+#         )
+        
+#         return new_key, pass_url
+    
+#     except Exception as e:
+#         db.rollback()
+#         logger.error(f"Error regenerating key: {str(e)}")
+#         raise ValueError(f"Error regenerating key: {str(e)}")
 
 # TODO: maybe invoke functions in key_service that
 # do not exists here to create endpoints, like get_key_details, get_key_usage_history etc

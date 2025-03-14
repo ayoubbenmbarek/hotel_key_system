@@ -27,8 +27,10 @@ def verify_key(
     This endpoint is called by the door lock system to verify if a key is valid
     """
     # Find key by UUID
+    print(verification.key_uuid)
+    print(DigitalKey.key_uuid)
     key = db.query(DigitalKey).filter(DigitalKey.key_uuid == verification.key_uuid).first()
-    
+
     # Create event record
     now = datetime.now(timezone.utc)
     event = KeyEvent(
@@ -42,7 +44,7 @@ def verify_key(
     )
     db.add(event)
     db.commit()
-    
+
     # Check if key exists
     if not key:
         event.status = "failure"

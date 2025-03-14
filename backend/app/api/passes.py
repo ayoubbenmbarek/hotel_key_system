@@ -68,31 +68,6 @@ def get_google_pass(pass_id: str):
     # For now, we'll just return a placeholder
     raise HTTPException(status_code=501, detail="Google Wallet integration not fully implemented")
 
-# @router.get("/passes/{pass_type_id}/{serial_number}")
-# async def get_latest_pass(
-#     pass_type_id: str,
-#     serial_number: str,
-#     authorization: str = Header(None)
-# ):
-#     """Serve the latest version of a pass"""
-#     # Get the token from the Authorization header
-#     if not authorization or not authorization.startswith("ApplePass "):
-#         raise HTTPException(status_code=401, detail="Invalid authorization")
-    
-#     auth_token = authorization.replace("ApplePass ", "")
-    
-#     # In a real implementation, verify the token matches the pass
-#     # For now, we'll just check if the pass exists
-    
-#     pass_path = Path(f"app/static/passes/hotelkey_{serial_number}.pkpass")
-#     if not pass_path.exists():
-#         raise HTTPException(status_code=404, detail="Pass not found")
-    
-#     return Response(
-#         content=open(pass_path, "rb").read(),
-#         media_type="application/vnd.apple.pkpass",
-#         headers={"Content-Disposition": f"attachment; filename=hotelkey_{serial_number}.pkpass"}
-#     )
 
 @router.get("/{pass_type}/passes/{pass_type_id}/{serial_number}", response_model=None)
 async def get_latest_pass(
