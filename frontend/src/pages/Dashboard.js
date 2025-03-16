@@ -1,13 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import Sidebar from '../components/Sidebar';
+import Header from '../components/Header';
+import ReservationList from '../components/ReservationList';
+import DigitalKeyList from '../components/DigitalKeyList';
+import UserProfile from '../components/UserProfile';
+import StaffPanel from '../components/StaffPanel';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://8f35-2a01-e0a-159-2b50-59fa-aa12-df1c-1016.ngrok-free.app/api/v1';
 
 function Dashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('reservations');
+  const [reservations, setReservations] = useState([]);
+  const [digitalKeys, setDigitalKeys] = useState([]);
+  const [reservationsLoading, setReservationsLoading] = useState(false);
+  const [keysLoading, setKeysLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,13 +37,24 @@ function Dashboard() {
           }
         });
         setUser(response.data);
+        
+        // Fetch initial data based on user role
+        if (response.data.role === 'guest') {
+          fetchUserReservations();
+          fetchUserKeys();
+        } else if (['admin', 'hotel_staff'].includes(response.data.role)) {
+          fetchAllReservations();
+          fetchAllKeys();
+        }
+        
       } catch (err) {
         console.error('Error fetching user data:', err);
-        setError('Failed to load user data');
         if (err.response?.status === 401) {
-          // Token expired or invalid
+          toast.error('Session expired. Please log in again.');
           localStorage.removeItem('token');
           navigate('/login');
+        } else {
+          toast.error('Failed to load user data. Please try again.');
         }
       } finally {
         setLoading(false);
@@ -41,6 +64,206 @@ function Dashboard() {
     fetchUserData();
   }, [navigate]);
 
+  const fetchUserReservations = async () => {
+    setReservationsLoading(true);
+    const token = localStorage.getItem('token');
+    
+    try {
+      const response = await axios.get(`${API_URL}/reservations`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setReservations(response.data);
+    } catch (err) {
+      console.error('Error fetching reservations:', err);
+      toast.error('Failed to load reservations');
+    } finally {
+      setReservationsLoading(false);
+    }
+  };
+
+  const fetchUserKeys = async () => {
+    setKeysLoading(true);
+    const token = localStorage.getItem('token');
+    
+    try {
+      // First get user's reservations if they haven't been loaded
+      let userReservations = reservations;
+      if (userReservations.length === 0) {
+        const reservationsResponse = await axios.get(`${API_URL}/reservations`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        userReservations = reservationsResponse.data;
+      }
+      
+      // Then get keys for each reservation
+      const keys = [];
+      for (const reservation of userReservations) {
+        const keysResponse = await axios.get(`${API_URL}/keys?reservation_id=${reservation.id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        keys.push(...keysResponse.data);
+      }
+      
+      setDigitalKeys(keys);
+    } catch (err) {
+      console.error('Error fetching keys:', err);
+      toast.error('Failed to load digital keys');
+    } finally {
+      setKeysLoading(false);
+    }
+  };
+
+  const fetchAllReservations = async () => {
+    setReservationsLoading(true);
+    const token = localStorage.getItem('token');
+    
+    try {
+      const response = await axios.get(`${API_URL}/reservations`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setReservations(response.data);
+    } catch (err) {
+      console.error('Error fetching all reservations:', err);
+      toast.error('Failed to load reservations');
+    } finally {
+      setReservationsLoading(false);
+    }
+  };
+
+  const fetchAllKeys = async () => {
+    setKeysLoading(true);
+    const token = localStorage.getItem('token');
+    
+    try {
+      const response = await axios.get(`${API_URL}/keys`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setDigitalKeys(response.data);
+    } catch (err) {
+      console.error('Error fetching all keys:', err);
+      toast.error('Failed to load digital keys');
+    } finally {
+      setKeysLoading(false);
+    }
+  };
+
+  const handleCreateKey = async (reservationId, passType, sendEmail) => {
+    const token = localStorage.getItem('token');
+    
+    try {
+      const response = await axios.post(`${API_URL}/keys`, 
+        {
+          reservation_id: reservationId,
+          pass_type: passType,
+          send_email: sendEmail
+        },
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+      
+      toast.success('Digital key created successfully');
+      
+      // Refresh keys list
+      if (user.role === 'guest') {
+        fetchUserKeys();
+      } else {
+        fetchAllKeys();
+      }
+      
+      return response.data;
+    } catch (err) {
+      console.error('Error creating digital key:', err);
+      toast.error(err.response?.data?.detail || 'Failed to create digital key');
+      throw err;
+    }
+  };
+
+  const handleActivateKey = async (keyId) => {
+    const token = localStorage.getItem('token');
+    
+    try {
+      await axios.patch(`${API_URL}/keys/${keyId}/activate`, {}, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      toast.success('Key activated successfully');
+      
+      // Refresh keys list
+      if (user.role === 'guest') {
+        fetchUserKeys();
+      } else {
+        fetchAllKeys();
+      }
+    } catch (err) {
+      console.error('Error activating key:', err);
+      toast.error(err.response?.data?.detail || 'Failed to activate key');
+    }
+  };
+
+  const handleDeactivateKey = async (keyId) => {
+    const token = localStorage.getItem('token');
+    
+    try {
+      await axios.patch(`${API_URL}/keys/${keyId}/deactivate`, {}, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      toast.success('Key deactivated successfully');
+      
+      // Refresh keys list
+      if (user.role === 'guest') {
+        fetchUserKeys();
+      } else {
+        fetchAllKeys();
+      }
+    } catch (err) {
+      console.error('Error deactivating key:', err);
+      toast.error(err.response?.data?.detail || 'Failed to deactivate key');
+    }
+  };
+
+  const handleExtendKey = async (keyId, newEndDate) => {
+    const token = localStorage.getItem('token');
+    
+    try {
+      await axios.patch(`${API_URL}/keys/${keyId}/extend`, 
+        { new_end_date: newEndDate },
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+      
+      toast.success('Key validity extended successfully');
+      
+      // Refresh keys list
+      if (user.role === 'guest') {
+        fetchUserKeys();
+      } else {
+        fetchAllKeys();
+      }
+    } catch (err) {
+      console.error('Error extending key validity:', err);
+      toast.error(err.response?.data?.detail || 'Failed to extend key validity');
+    }
+  };
+
+  const handleSendKeyEmail = async (keyId) => {
+    const token = localStorage.getItem('token');
+    
+    try {
+      // This endpoint is not in the original API, but would be useful
+      await axios.post(`${API_URL}/keys/${keyId}/send-email`, {}, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      toast.success('Key email sent successfully');
+    } catch (err) {
+      console.error('Error sending key email:', err);
+      toast.error('Failed to send key email');
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     navigate('/login');
@@ -48,89 +271,71 @@ function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl text-gray-600">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-indigo-600 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <div className="text-white font-bold text-xl">Hotel Virtual Key System</div>
-            </div>
-            <div className="flex items-center">
-              {user && (
-                <div className="text-white mr-4">
-                  Welcome, {user.first_name} {user.last_name}
-                </div>
-              )}
-              <button
-                onClick={handleLogout}
-                className="ml-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-700 hover:bg-indigo-800"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="border-4 border-dashed border-gray-200 rounded-lg p-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Dashboard</h1>
-            
-            {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                {error}
-              </div>
+    <div className="flex h-screen bg-gray-100">
+      <ToastContainer position="top-right" autoClose={3000} />
+      
+      {/* Sidebar */}
+      <Sidebar 
+        user={user} 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
+        onLogout={handleLogout} 
+      />
+      
+      {/* Main content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header user={user} onLogout={handleLogout} />
+        
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-4">
+          <div className="container mx-auto">
+            {/* Render content based on active tab */}
+            {activeTab === 'reservations' && (
+              <ReservationList 
+                reservations={reservations} 
+                loading={reservationsLoading} 
+                onCreateKey={handleCreateKey}
+                isStaff={['admin', 'hotel_staff'].includes(user?.role)}
+                onRefresh={user?.role === 'guest' ? fetchUserReservations : fetchAllReservations}
+              />
             )}
-
-            <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-              <div className="px-4 py-5 sm:px-6">
-                <h2 className="text-lg font-medium text-gray-900">User Information</h2>
-              </div>
-              {user && (
-                <div className="border-t border-gray-200">
-                  <dl>
-                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Full name</dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {user.first_name} {user.last_name}
-                      </dd>
-                    </div>
-                    <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Email address</dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {user.email}
-                      </dd>
-                    </div>
-                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Role</dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {user.role}
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-              )}
-            </div>
-
-            <div className="text-center mt-8">
-              <p className="text-gray-600">
-                This is a placeholder dashboard for the Hotel Virtual Key System.
-              </p>
-              <p className="text-gray-600 mt-2">
-                Implement more features here as needed.
-              </p>
-            </div>
+            
+            {activeTab === 'keys' && (
+              <DigitalKeyList 
+                keys={digitalKeys} 
+                loading={keysLoading} 
+                onActivate={handleActivateKey}
+                onDeactivate={handleDeactivateKey}
+                onExtend={handleExtendKey}
+                onSendEmail={handleSendKeyEmail}
+                isStaff={['admin', 'hotel_staff'].includes(user?.role)}
+                onRefresh={user?.role === 'guest' ? fetchUserKeys : fetchAllKeys}
+              />
+            )}
+            
+            {activeTab === 'profile' && (
+              <UserProfile 
+                user={user} 
+                setUser={setUser}
+              />
+            )}
+            
+            {activeTab === 'staff' && ['admin', 'hotel_staff'].includes(user?.role) && (
+              <StaffPanel 
+                user={user} 
+                onRefreshReservations={fetchAllReservations}
+                onRefreshKeys={fetchAllKeys}
+              />
+            )}
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
