@@ -16,6 +16,7 @@ import hashlib
 import requests
 
 from app.config import settings
+from app.utils.date_formatting import format_datetime_with_timezone
 from app.models.digital_key import KeyType, DigitalKey
 from app.services.wallet_push_service import save_auth_token_to_db
 
@@ -83,12 +84,15 @@ def create_apple_wallet_pass(pass_data, db=None):
             with tempfile.TemporaryDirectory() as temp_dir:
                 temp_path = Path(temp_dir)
                 
-                check_in_dt = datetime.fromisoformat(pass_data['check_in']).replace(microsecond=0)
-                formatted_check_in = check_in_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+                # check_in_dt = datetime.fromisoformat(pass_data['check_in']).replace(microsecond=0)
+                # formatted_check_in = check_in_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-                # Similarly for check_out
-                check_out_dt = datetime.fromisoformat(pass_data['check_out']).replace(microsecond=0)
-                formatted_check_out = check_out_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+                # # Similarly for check_out
+                # check_out_dt = datetime.fromisoformat(pass_data['check_out']).replace(microsecond=0)
+                # formatted_check_out = check_out_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+                # Format dates with proper timezone
+                formatted_check_in = format_datetime_with_timezone(pass_data['check_in'])
+                formatted_check_out = format_datetime_with_timezone(pass_data['check_out'])
                 pkpass_filename = f"hotelkey_{pass_data['key_uuid']}.pkpass"
                 # Create pass.json structure
                 pass_json = {
@@ -217,7 +221,7 @@ def create_apple_wallet_pass(pass_data, db=None):
                     "relevantDate": formatted_check_in,
                     "expirationDate": formatted_check_out,
                     "voided": not pass_data.get('is_active', True),
-                    "webServiceURL": settings.PASS_BASE_URL or "https://2e24-2a01-e0a-159-2b50-b46f-2afb-eef3-7ede.ngrok-free.app/api/v1/passes",
+                    "webServiceURL": (settings.PASS_BASE_URL or "https://8f35-2a01-e0a-159-2b50-59fa-aa12-df1c-1016.ngrok-free.app/api/v1/passes") + "/",
                     "authenticationToken": auth_token
                 }
 

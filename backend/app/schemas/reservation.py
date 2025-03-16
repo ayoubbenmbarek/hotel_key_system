@@ -1,5 +1,5 @@
 # backend/app/schemas/reservation.py
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, ValidationInfo
 from typing import Optional, List
 from datetime import datetime
 
@@ -16,8 +16,21 @@ class ReservationBase(BaseModel):
     special_requests: Optional[str] = None
     
     @field_validator('check_out')
-    def check_out_must_be_after_check_in(cls, v, values):
-        if 'check_in' in values and v <= values['check_in']:
+    def check_out_must_be_after_check_in(cls, v, info: ValidationInfo):
+        """Validate that check-out date is after check-in date
+        
+        Args:
+            v: The check-out date value being validated
+            info: Validation information containing other field values
+            
+        Raises:
+            ValueError: If check-out date is not after check-in date
+            
+        Returns:
+            The validated check-out date
+        """
+        data = info.data  # Get the data dictionary
+        if 'check_in' in data and v <= data['check_in']:
             raise ValueError('Check-out must be after check-in')
         return v
 

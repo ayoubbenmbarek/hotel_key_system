@@ -1,5 +1,6 @@
 # backend/app/api/keys.py
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Optional
+from fastapi import Query
 import uuid
 import logging
 from datetime import datetime, timezone
@@ -284,7 +285,7 @@ def extend_key_validity(
         # Get all necessary data
         room = db.query(Room).filter(Room.id == reservation.room_id).first()
         user = db.query(User).filter(User.id == reservation.user_id).first()
-        
+
         pass_data = {
             "key_uuid": key.key_uuid,
             "room_number": room.room_number,
@@ -320,6 +321,44 @@ def extend_key_validity(
     db.commit()
     
     return key
+
+# @router.get("/{pass_type_id}")
+# async def get_changed_passes(
+#     pass_type_id: str,
+#     passesUpdatedSince: Optional[str] = Query(None),
+#     db: Session = Depends(get_db)
+# ):
+#     """Return serial numbers of passes that have changed since a timestamp"""
+#     logger.info(f"What changed request for pass type: {pass_type_id}, since: {passesUpdatedSince}")
+    
+#     # Parse the timestamp if provided
+#     update_since = None
+#     if passesUpdatedSince:
+#         try:
+#             update_since = datetime.strptime(passesUpdatedSince, "%Y-%m-%dT%H:%M:%SZ")
+#             update_since = update_since.replace(tzinfo=timezone.utc)
+#         except ValueError:
+#             logger.warning(f"Invalid timestamp format: {passesUpdatedSince}")
+    
+#     # Query for updated passes
+#     query = db.query(DigitalKey).filter(
+#         DigitalKey.pass_type == KeyType.APPLE
+#     )
+    
+#     if update_since:
+#         query = query.filter(DigitalKey.updated_at > update_since)
+    
+#     # Get the serial numbers
+#     serial_numbers = [key.key_uuid for key in query.all()]
+    
+#     # Get current timestamp for lastUpdated
+#     last_updated = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    
+#     # Return both serialNumbers and lastUpdated
+#     return {
+#         "serialNumbers": serial_numbers,
+#         "lastUpdated": last_updated
+#     }
 
 
 @router.patch("/{key_id}/activate", response_model=DigitalKeySchema)
@@ -425,7 +464,7 @@ def deactivate_key(
         key.id,
         is_active=False
     )
-    
+
     return key
 
 

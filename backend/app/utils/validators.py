@@ -77,10 +77,10 @@ def format_confirmation_code(code: str) -> str:
     """Format confirmation code for display"""
     if not code:
         return ""
-    
+
     code = code.upper()
     if len(code) >= 3 and code.startswith("RES"):
         # Format as RES-XXXXX
         return f"{code[:3]}-{code[3:]}"
-    
+
     return code

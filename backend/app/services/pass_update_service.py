@@ -4,6 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.models.digital_key import DigitalKey, KeyType
 from app.models.reservation import Reservation
+from app.services.wallet_push_service import send_push_notifications_production
+from app.services.wallet_service import settings
+
 from app.models.room import Room
 from app.models.user import User
 from app.services.wallet_service import create_apple_wallet_pass, create_google_wallet_pass
@@ -46,12 +49,16 @@ def update_wallet_pass_status(db: Session, key_id: str, is_active: bool = True):
         if key.pass_type == KeyType.APPLE:
             create_apple_wallet_pass(pass_data, db)
             logger.info(f"Apple Wallet pass updated for key {key_id}")
+            # Send push notification
+            send_push_notifications_production(settings.APPLE_PASS_TYPE_ID, key.key_uuid)
+            
         elif key.pass_type == KeyType.GOOGLE:
             create_google_wallet_pass(pass_data)
             logger.info(f"Google Wallet pass updated for key {key_id}")
         
         # In a production environment, you would send a push notification here
         # For now, we'll just log it
+        
         logger.info(f"Would send push notification for key {key_id} status update")
         
     except Exception as e:

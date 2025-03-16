@@ -6,6 +6,7 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from datetime import datetime
 import os
+import time
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 import qrcode
@@ -47,7 +48,7 @@ def generate_qr_code(url):
     return buffered.getvalue()
 
 
-def send_key_email(recipient_email, guest_name, pass_url, key_id, pass_data):
+def send_key_email(recipient_email, guest_name, pass_url, key_id, pass_data, max_retries=3):
     """Send email with digital key information to guest"""
     try:
         # Create message
@@ -109,23 +110,31 @@ def send_key_email(recipient_email, guest_name, pass_url, key_id, pass_data):
         msg.attach(qr_image)
         
         # Connect to SMTP server and send email
-        # with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-        #     server.send_message(msg)
-        # In production we will use this
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login("ayoubenmbarek@gmail.com", "uojt dktu yfrw vrdn")
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
             server.send_message(msg)
-        # with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-        #     if settings.SMTP_TLS:
-        #         server.starttls()
-        #     if settings.SMTP_USER and settings.SMTP_PASSWORD:
-        #         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            # server.send_message(msg)
-        
-        logger.info(f"Digital key email sent successfully to {recipient_email}")
-        return True
-    
+        # In production we will use this
+        # for attempt in range(max_retries):
+        #     try:
+        #         with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        #             server.starttls()
+        #             server.login("ayoubenmbarek@gmail.com", "uojt dktu yfrw vrdn")
+        #             server.send_message(msg)
+        #         # with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        #         # # Use port 465 with SMTP_SSL (no starttls() needed)
+        #         #     if settings.SMTP_TLS:
+        #         #         server.starttls()
+        #         #     if settings.SMTP_USER and settings.SMTP_PASSWORD:
+        #         #         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        #         #     server.send_message(msg)
+                
+        #         logger.info(f"Digital key email sent successfully to {recipient_email}")
+        #         return True
+        #     except Exception as e:
+        #         logger.warning(f"Email sending attempt {attempt+1} failed: {str(e)}")
+        #         time.sleep(2 ** attempt)  # Exponential backoff
+    # Use a more robust email sending service:
+    # Consider using a third-party email service like SendGrid, Mailgun, or Amazon SES that has built-in 
+    # retries and better reliability than direct SMTP connections
     except Exception as e:
         logger.error(f"Failed to send digital key email: {str(e)}")
         return False
@@ -158,14 +167,14 @@ def send_key_download_link(recipient_email, guest_name, key_id):
         
         # Create plain text version
         text_content = f"""
-Hello {guest_name},
+            Hello {guest_name},
 
-You can download your digital room key by visiting this link:
-{download_url}
+            You can download your digital room key by visiting this link:
+            {download_url}
 
-Best regards,
-The {settings.HOTEL_NAME} Team
-        """
+            Best regards,
+            The {settings.HOTEL_NAME} Team
+                    """
         
         # Attach text and HTML versions
         msg.attach(MIMEText(text_content, 'plain'))

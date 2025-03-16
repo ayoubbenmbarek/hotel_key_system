@@ -70,6 +70,7 @@ def get_google_pass(pass_id: str):
 
 
 @router.get("/{pass_type}/passes/{pass_type_id}/{serial_number}", response_model=None)
+# @router.get("/{pass_type_id}/{serial_number}", response_model=None)
 async def get_latest_pass(
     pass_type_id: str,
     serial_number: str,
@@ -144,6 +145,52 @@ async def get_latest_pass(
         media_type="application/vnd.apple.pkpass",
         filename=pkpass_filename
     )
+
+@router.get("/{pass_type}/passes/{pass_type_id}")
+async def get_changed_passes(
+    pass_type_id: str,
+    passesUpdatedSince: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Return serial numbers of passes that have changed since a timestamp"""
+    logger.info(f"What changed request for pass type: {pass_type_id}, since: {passesUpdatedSince}")
+    
+    # Parse the timestamp if provided
+    update_since = None
+    if passesUpdatedSince:
+        try:
+            update_since = datetime.strptime(passesUpdatedSince, "%Y-%m-%dT%H:%M:%SZ")
+            update_since = update_since.replace(tzinfo=timezone.utc)
+        except ValueError:
+            logger.warning(f"Invalid timestamp format: {passesUpdatedSince}")
+    
+    # Query for updated passes
+    query = db.query(DigitalKey).filter(
+        DigitalKey.pass_type == KeyType.APPLE,
+        DigitalKey.is_active == True
+    )
+    
+    if update_since:
+        query = query.filter(DigitalKey.updated_at > update_since)
+    
+    # Get the serial numbers and find the latest update timestamp
+    serial_numbers = []
+    last_updated = datetime.now(timezone.utc)
+    
+    for key in query.all():
+        serial_numbers.append(key.key_uuid)
+        if key.updated_at and (not last_updated or key.updated_at > last_updated):
+            last_updated = key.updated_at
+    
+    # Format the timestamp in ISO 8601 format
+    last_updated_str = last_updated.strftime("%Y-%m-%dT%H:%M:%SZ")
+    
+    # Return the response in the format expected by Apple Wallet
+    return {
+        "serialNumbers": serial_numbers,
+        "lastUpdated": last_updated_str
+    }
+
 
 @router.post("/{pass_type}/devices/{device_library_id}/registrations/{pass_type_id}/{serial_number}")
 async def register_device(
