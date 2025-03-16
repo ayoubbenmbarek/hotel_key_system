@@ -209,5 +209,79 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect():
     """Handle WebSocket disconnection"""
-    # TODO: continue with claude for the rest of the code
-    logger.info("")
+    logger.info('Client disconnected')
+
+@socketio.on('scan_key')
+def handle_scan_key(data):
+    """Handle key scanning event from client"""
+    key_uuid = data.get('key_uuid')
+    lock_id = data.get('lock_id')
+    if key_uuid and lock_id:
+        logger.info(f'Scanning key {key_uuid} for lock {lock_id}')
+        
+        try:
+            # Verify key with the backend API
+            response = requests.post(
+                f"{API_URL}/verify/key",
+                json={
+                    'key_uuid': key_uuid,
+                    'lock_id': lock_id,
+                    'device_info': data.get('device_info', DEFAULT_DEVICE_INFO),
+                    'location': data.get('location', DEFAULT_LOCATION)
+                }
+            )
+            
+            result = response.json()
+            
+            # Add to verification history
+            verification_entry = {
+                'timestamp': datetime.now().isoformat(),
+                'key_uuid': key_uuid,
+                'lock_id': lock_id,
+                'result': result,
+                'status': 'success' if result.get('is_valid', False) else 'error'
+            }
+            verification_history.insert(0, verification_entry)
+            
+            # Keep history limited to last 100 entries
+            if len(verification_history) > 100:
+                verification_history.pop()
+            
+            # Emit result to all clients
+            emit('verification_result', verification_entry, broadcast=True)
+            
+        except requests.RequestException as e:
+            logger.error(f"Error verifying key: {e}")
+            emit('error', {'message': f'Error communicating with API: {str(e)}'})
+    else:
+        emit('error', {'message': 'Key UUID and Lock ID are required'})
+
+if __name__ == '__main__':
+    # Add some default locks
+    if not locks:
+        locks.append({
+            'lock_id': 'LOCK-A123B456',
+            'location': 'Main Entrance',
+            'description': 'Front Door',
+            'created_at': datetime.now().isoformat()
+        })
+        locks.append({
+            'lock_id': 'LOCK-B789C012',
+            'location': 'Room 101',
+            'description': 'Standard Room',
+            'created_at': datetime.now().isoformat()
+        })
+        locks.append({
+            'lock_id': 'LOCK-D345E678',
+            'location': 'Room 201',
+            'description': 'Deluxe Room',
+            'created_at': datetime.now().isoformat()
+        })
+    
+    # Run the Flask application with SocketIO
+    port = int(os.getenv('PORT', 5000))
+    host = os.getenv('HOST', '0.0.0.0')
+    debug = os.getenv('DEBUG', 'False').lower() == 'true'
+    
+    logger.info(f'Starting NFC Simulator on {host}:{port} (debug={debug})')
+    socketio.run(app, host=host, port=port, debug=debug)
