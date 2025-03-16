@@ -84,15 +84,15 @@ def create_apple_wallet_pass(pass_data, db=None):
             with tempfile.TemporaryDirectory() as temp_dir:
                 temp_path = Path(temp_dir)
                 
-                # check_in_dt = datetime.fromisoformat(pass_data['check_in']).replace(microsecond=0)
-                # formatted_check_in = check_in_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+                check_in_dt = datetime.fromisoformat(pass_data['check_in']).replace(microsecond=0)
+                formatted_check_in = check_in_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-                # # Similarly for check_out
-                # check_out_dt = datetime.fromisoformat(pass_data['check_out']).replace(microsecond=0)
-                # formatted_check_out = check_out_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+                # Similarly for check_out
+                check_out_dt = datetime.fromisoformat(pass_data['check_out']).replace(microsecond=0)
+                formatted_check_out = check_out_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
                 # Format dates with proper timezone
-                formatted_check_in = format_datetime_with_timezone(pass_data['check_in'])
-                formatted_check_out = format_datetime_with_timezone(pass_data['check_out'])
+                # formatted_check_in = format_datetime_with_timezone(pass_data['check_in'])
+                # formatted_check_out = format_datetime_with_timezone(pass_data['check_out'])
                 pkpass_filename = f"hotelkey_{pass_data['key_uuid']}.pkpass"
                 # Create pass.json structure
                 pass_json = {
