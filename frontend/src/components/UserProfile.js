@@ -1,22 +1,35 @@
 // frontend/src/components/UserProfile.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL || 'https://8f35-2a01-e0a-159-2b50-59fa-aa12-df1c-1016.ngrok-free.app/api/v1';
+import { API_URL } from '../config';
 
 function UserProfile({ user, setUser }) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    first_name: user?.first_name || '',
-    last_name: user?.last_name || '',
-    email: user?.email || '',
-    phone_number: user?.phone_number || '',
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone_number: '',
     password: '',
     confirmPassword: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Initialize form data when user prop changes
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        email: user.email || '',
+        phone_number: user.phone_number || '',
+        password: '',
+        confirmPassword: ''
+      });
+    }
+  }, [user]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -50,6 +63,8 @@ function UserProfile({ user, setUser }) {
         updateData.password = formData.password;
       }
       
+      console.log(`Updating user profile to ${API_URL}/users/me`);
+      
       // Send update request
       const token = localStorage.getItem('token');
       const response = await axios.put(
@@ -62,8 +77,16 @@ function UserProfile({ user, setUser }) {
         }
       );
       
+      console.log("Profile update response:", response.data);
+      
+      // Create updated user object
+      const updatedUser = {
+        ...user,
+        ...response.data
+      };
+      
       // Update local user data
-      setUser(response.data);
+      setUser(updatedUser);
       
       // Show success and reset form
       setSuccess('Profile updated successfully');
@@ -276,22 +299,22 @@ function UserProfile({ user, setUser }) {
             <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
               <div className="sm:col-span-3">
                 <h3 className="text-sm font-medium text-gray-500">First name</h3>
-                <p className="mt-1 text-sm text-gray-900">{user?.first_name}</p>
+                <p className="mt-1 text-sm text-gray-900">{user?.first_name || 'Not provided'}</p>
               </div>
 
               <div className="sm:col-span-3">
                 <h3 className="text-sm font-medium text-gray-500">Last name</h3>
-                <p className="mt-1 text-sm text-gray-900">{user?.last_name}</p>
+                <p className="mt-1 text-sm text-gray-900">{user?.last_name || 'Not provided'}</p>
               </div>
 
               <div className="sm:col-span-3">
                 <h3 className="text-sm font-medium text-gray-500">Email address</h3>
-                <p className="mt-1 text-sm text-gray-900">{user?.email}</p>
+                <p className="mt-1 text-sm text-gray-900">{user?.email || 'Not provided'}</p>
               </div>
 
               <div className="sm:col-span-3">
                 <h3 className="text-sm font-medium text-gray-500">Phone number</h3>
-                <p className="mt-1 text-sm text-gray-900">{user?.phone_number || '-'}</p>
+                <p className="mt-1 text-sm text-gray-900">{user?.phone_number || 'Not provided'}</p>
               </div>
 
               <div className="sm:col-span-3">
@@ -299,7 +322,7 @@ function UserProfile({ user, setUser }) {
                 <p className="mt-1 text-sm text-gray-900">
                   {user?.role === 'admin' ? 'Administrator' : 
                    user?.role === 'hotel_staff' ? 'Hotel Staff' : 
-                   user?.role === 'guest' ? 'Guest' : user?.role}
+                   user?.role === 'guest' ? 'Guest' : user?.role || 'Not assigned'}
                 </p>
               </div>
 

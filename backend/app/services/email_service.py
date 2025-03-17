@@ -110,28 +110,28 @@ def send_key_email(recipient_email, guest_name, pass_url, key_id, pass_data, max
         msg.attach(qr_image)
         
         # Connect to SMTP server and send email
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-            server.send_message(msg)
+        # with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        #     server.send_message(msg)
         # In production we will use this
-        # for attempt in range(max_retries):
-        #     try:
-        #         with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        #             server.starttls()
-        #             server.login("ayoubenmbarek@gmail.com", "uojt dktu yfrw vrdn")
-        #             server.send_message(msg)
-        #         # with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-        #         # # Use port 465 with SMTP_SSL (no starttls() needed)
-        #         #     if settings.SMTP_TLS:
-        #         #         server.starttls()
-        #         #     if settings.SMTP_USER and settings.SMTP_PASSWORD:
-        #         #         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        #         #     server.send_message(msg)
+        for attempt in range(max_retries):
+            try:
+                with smtplib.SMTP("smtp.gmail.com", 587) as server:
+                    server.starttls()
+                    server.login("ayoubenmbarek@gmail.com", "uojt dktu yfrw vrdn")
+                    server.send_message(msg)
+                # with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+                # # Use port 465 with SMTP_SSL (no starttls() needed)
+                #     if settings.SMTP_TLS:
+                #         server.starttls()
+                #     if settings.SMTP_USER and settings.SMTP_PASSWORD:
+                #         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                #     server.send_message(msg)
                 
-        #         logger.info(f"Digital key email sent successfully to {recipient_email}")
-        #         return True
-        #     except Exception as e:
-        #         logger.warning(f"Email sending attempt {attempt+1} failed: {str(e)}")
-        #         time.sleep(2 ** attempt)  # Exponential backoff
+                logger.info(f"Digital key email sent successfully to {recipient_email}")
+                return True
+            except Exception as e:
+                logger.warning(f"Email sending attempt {attempt+1} failed: {str(e)}")
+                time.sleep(2 ** attempt)  # Exponential backoff
     # Use a more robust email sending service:
     # Consider using a third-party email service like SendGrid, Mailgun, or Amazon SES that has built-in 
     # retries and better reliability than direct SMTP connections

@@ -30,7 +30,13 @@ class KeyExtension(BaseModel):
     
     @field_validator('new_end_date')
     def validate_end_date(cls, v):
-        if v < datetime.now(timezone.utc):
+        # Convert to timezone-aware datetime if it's naive
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+            
+        # Now compare with current time (also timezone-aware)
+        now = datetime.now(timezone.utc)
+        if v < now:
             raise ValueError('New end date must be in the future')
         return v
 

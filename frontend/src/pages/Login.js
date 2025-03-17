@@ -1,8 +1,8 @@
+// frontend/src/pages/Login.js
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL || 'https://8f35-2a01-e0a-159-2b50-59fa-aa12-df1c-1016.ngrok-free.app/api/v1';
+import { API_URL } from '../config';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -17,6 +17,8 @@ function Login() {
     setLoading(true);
 
     try {
+      console.log(`Attempting login to ${API_URL}/auth/login`);
+      
       const response = await axios.post(`${API_URL}/auth/login`, 
         new URLSearchParams({
           'username': email,
@@ -29,6 +31,8 @@ function Login() {
         }
       );
 
+      console.log("Login response:", response);
+
       if (response.data.access_token) {
         // Store token in localStorage
         localStorage.setItem('token', response.data.access_token);
@@ -40,7 +44,16 @@ function Login() {
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError(err.response?.data?.detail || 'Login failed. Please try again.');
+      
+      if (err.response) {
+        console.error('Error response:', err.response.data);
+        setError(err.response?.data?.detail || 'Login failed. Please check your credentials and try again.');
+      } else if (err.request) {
+        console.error('Error request:', err.request);
+        setError('Network error. Please check your connection and try again.');
+      } else {
+        setError('Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -56,6 +69,9 @@ function Login() {
           <h3 className="mt-2 text-center text-xl text-gray-600">
             Sign in to your account
           </h3>
+          <p className="mt-2 text-center text-sm text-gray-500">
+            API URL: {API_URL}
+          </p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>

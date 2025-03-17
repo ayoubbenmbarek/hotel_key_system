@@ -468,6 +468,93 @@ def deactivate_key(
     return key
 
 
+# Add this to your backend/app/api/keys.py file
+
+@router.post("/{key_id}/send-email", status_code=status.HTTP_200_OK)
+def send_key_email_endpoint(
+    *,
+    db: Session = Depends(get_db),
+    key_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user)
+) -> dict:
+    """
+    Send email with digital key pass to the user
+    """
+    # Get the digital key
+    key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Digital key not found"
+        )
+
+    # Check permissions for non-staff users
+    if current_user.role not in ["admin", "hotel_staff"]:
+        reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
+        if not reservation or reservation.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions"
+            )
+
+    # Get reservation and user info
+    reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
+    if not reservation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reservation not found for this key"
+        )
+    
+    user = db.query(User).filter(User.id == reservation.user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found for this reservation"
+        )
+    
+    room = db.query(Room).filter(Room.id == reservation.room_id).first()
+    if not room:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room not found for this reservation"
+        )
+    
+    # Create pass data for email
+    pass_data = {
+        "key_uuid": key.key_uuid,
+        "hotel_name": room.hotel.name if room.hotel else "Hotel",
+        "room_number": room.room_number,
+        "guest_name": f"{user.first_name} {user.last_name}",
+        "check_in": reservation.check_in.isoformat(),
+        "check_out": reservation.check_out.isoformat(),
+        "nfc_lock_id": room.nfc_lock_id
+    }
+    
+    # Send email in background
+    background_tasks.add_task(
+        send_key_email,
+        user.email,
+        f"{user.first_name} {user.last_name}",
+        key.pass_url,
+        key.id,
+        pass_data
+    )
+    
+    # Log the email send event
+    event = KeyEvent(
+        key_id=key.id,
+        event_type="key_email_sent",
+        device_info=f"API request by {current_user.email}",
+        status="success",
+        details=f"Email sent to {user.email} for {key.pass_type.value} pass"
+    )
+    db.add(event)
+    db.commit()
+    
+    return {"message": f"Email with digital key sent to {user.email}"}
+
+
 @router.get("/{key_id}/events", response_model=List[KeyEventSchema])
 def read_key_events(
     key_id: str,

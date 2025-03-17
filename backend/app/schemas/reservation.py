@@ -56,6 +56,7 @@ class Reservation(ReservationBase):
     status: ReservationStatus
     created_at: datetime
     updated_at: datetime
+    # room: Optional[RoomSchema] TODO set up this later to show room number in reservation
     
     model_config = {
         "from_attributes": True
