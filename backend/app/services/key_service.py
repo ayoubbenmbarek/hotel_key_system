@@ -218,63 +218,6 @@ def deactivate_key(db: Session, key_id: str) -> DigitalKey:
         raise ValueError(f"Error deactivating key: {str(e)}")
 
 
-# def extend_key_validity(db: Session, key_id: str, new_end_date: datetime) -> DigitalKey:
-#     """
-#     Extend the validity period of a digital key
-    
-#     Args:
-#         db: Database session
-#         key_id: Key ID
-#         new_end_date: New end date for the key
-    
-#     Returns:
-#         Updated DigitalKey object
-    
-#     Raises:
-#         ValueError: If key not found or new date is invalid
-#     """
-#     try:
-#         key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
-#         if not key:
-#             raise ValueError("Digital key not found")
-        
-#         # Validate new end date
-#         if new_end_date <= key.valid_from:
-#             raise ValueError("New end date must be after the start date")
-        
-#         if new_end_date <= datetime.now(timezone.utc):
-#             raise ValueError("New end date must be in the future")
-        
-#         # Update key validity
-#         key.valid_until = new_end_date
-        
-#         # Also update the reservation check-out date
-#         reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
-#         if reservation:
-#             reservation.check_out = new_end_date
-#             db.add(reservation)
-        
-#         # Log extension
-#         event = KeyEvent(
-#             key_id=key.id,
-#             event_type="key_extended",
-#             timestamp=datetime.now(timezone.utc),
-#             status="success",
-#             details=f"Extended until: {new_end_date.isoformat()}"
-#         )
-        
-#         db.add(key)
-#         db.add(event)
-#         db.commit()
-#         db.refresh(key)
-        
-#         return key
-    
-#     except Exception as e:
-#         db.rollback()
-#         logger.error(f"Error extending key validity: {str(e)}")
-#         raise ValueError(f"Error extending key validity: {str(e)}")
-
 def update_checkout_date(serial_number, new_checkout_date, db):
     """
     Update the checkout date for a digital key and its associated reservation
