@@ -73,7 +73,9 @@ function AddUserForm({ onSuccess, onCancel }) {
       onSuccess(response.data);
     } catch (err) {
       console.error('Error creating user:', err);
-      setError(err.response?.data?.detail || 'Failed to create user');
+      // Convert error to string to prevent React render issues
+      const errorMsg = err.response?.data?.detail || 'Failed to create user';
+      setError(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
     } finally {
       setLoading(false);
     }

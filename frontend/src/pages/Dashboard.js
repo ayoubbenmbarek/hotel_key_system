@@ -8,10 +8,10 @@ import ReservationList from '../components/ReservationList';
 import DigitalKeyList from '../components/DigitalKeyList';
 import UserProfile from '../components/UserProfile';
 import StaffPanel from '../components/StaffPanel';
+import AddReservationForm from '../components/AddReservationForm';
+import AddUserForm from '../components/AddUserForm';
 import { API_URL } from '../config';
 
-// Install react-toastify
-// npm install react-toastify
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -23,6 +23,8 @@ function Dashboard() {
   const [digitalKeys, setDigitalKeys] = useState([]);
   const [reservationsLoading, setReservationsLoading] = useState(false);
   const [keysLoading, setKeysLoading] = useState(false);
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [showAddReservation, setShowAddReservation] = useState(false);
   const navigate = useNavigate();
   
   // Use refs to prevent infinite request loops
@@ -331,7 +333,6 @@ function Dashboard() {
       const dateObj = new Date(newEndDateTime);
       
       // Use ISO string which includes milliseconds and timezone
-      // This creates a format like: 2025-07-15T15:07:00.000Z
       const isoString = dateObj.toISOString();
       
       console.log(`Extending key ${keyId} to new end date/time (ISO): ${isoString}`);
@@ -406,6 +407,35 @@ function Dashboard() {
     navigate('/login');
   };
 
+  // Handle adding a new user
+  const handleAddUser = (newUser) => {
+    toast.success('User created successfully');
+    setShowAddUser(false);
+    
+    // Refresh the data if needed
+    if (['admin', 'hotel_staff'].includes(user?.role)) {
+      // Refresh users data if on the staff panel
+      if (activeTab === 'staff') {
+        // Since there's no dedicated fetch users function, 
+        // we'll just reload the whole component
+        initialDataLoaded.current = false;
+        
+        // Refresh the staff panel data
+        fetchAllReservations();
+        fetchAllKeys();
+      }
+    }
+  };
+
+  // Handle adding a new reservation
+  const handleAddReservation = (newReservation) => {
+    toast.success('Reservation created successfully');
+    setShowAddReservation(false);
+    
+    // Refresh the reservations list
+    fetchAllReservations();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -440,6 +470,7 @@ function Dashboard() {
                 onCreateKey={handleCreateKey}
                 isStaff={['admin', 'hotel_staff'].includes(user?.role)}
                 onRefresh={user?.role === 'guest' ? fetchUserReservations : fetchAllReservations}
+                onAddReservation={() => setShowAddReservation(true)}
               />
             )}
             
@@ -468,11 +499,48 @@ function Dashboard() {
                 user={user} 
                 onRefreshReservations={fetchAllReservations}
                 onRefreshKeys={fetchAllKeys}
+                onAddUser={() => setShowAddUser(true)}
               />
             )}
           </div>
         </main>
       </div>
+
+      {/* Add User Modal */}
+      {showAddUser && (
+        <div className="fixed z-10 inset-0 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <AddUserForm 
+                onSuccess={handleAddUser} 
+                onCancel={() => setShowAddUser(false)} 
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Reservation Modal */}
+      {showAddReservation && (
+        <div className="fixed z-10 inset-0 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <AddReservationForm 
+                onSuccess={handleAddReservation} 
+                onCancel={() => setShowAddReservation(false)} 
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

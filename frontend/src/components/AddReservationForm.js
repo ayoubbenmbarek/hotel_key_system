@@ -18,6 +18,39 @@ function AddReservationForm({ onSuccess, onCancel }) {
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState('');
 
+  // Safely parse and extract error messages from different error formats
+  const getErrorMessage = (err) => {
+    // Case 1: Error is an array of validation errors
+    if (err.response?.data && Array.isArray(err.response.data)) {
+      try {
+        const messages = err.response.data.map(item => {
+          return item.msg || 'Validation error';
+        });
+        return messages.join('. ');
+      } catch (e) {
+        return 'Validation error occurred. Please check your inputs.';
+      }
+    }
+    
+    // Case 2: Error has a detail field
+    if (err.response?.data?.detail) {
+      return String(err.response.data.detail);
+    }
+    
+    // Case 3: Error response data is a string
+    if (typeof err.response?.data === 'string') {
+      return err.response.data;
+    }
+    
+    // Case 4: Error message is available
+    if (err.message) {
+      return err.message;
+    }
+    
+    // Default fallback
+    return 'An error occurred while creating the reservation';
+  };
+
   // Fetch users and rooms for dropdowns
   useEffect(() => {
     const fetchData = async () => {
@@ -38,7 +71,7 @@ function AddReservationForm({ onSuccess, onCancel }) {
         setRooms(Array.isArray(roomsResponse.data) ? roomsResponse.data : []);
       } catch (err) {
         console.error('Error fetching form data:', err);
-        setError('Failed to load users and rooms data');
+        setError(getErrorMessage(err));
       } finally {
         setLoadingData(false);
       }
@@ -55,8 +88,28 @@ function AddReservationForm({ onSuccess, onCancel }) {
     });
   };
 
+  const validateDates = () => {
+    // Basic date validation - check that check-out is after check-in
+    if (formData.check_in && formData.check_out) {
+      const checkIn = new Date(formData.check_in);
+      const checkOut = new Date(formData.check_out);
+      
+      if (checkOut <= checkIn) {
+        setError('Check-out date must be after check-in date');
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Client-side validation
+    if (!validateDates()) {
+      return;
+    }
+    
     setLoading(true);
     setError('');
     
@@ -77,7 +130,10 @@ function AddReservationForm({ onSuccess, onCancel }) {
       onSuccess(response.data);
     } catch (err) {
       console.error('Error creating reservation:', err);
-      setError(err.response?.data?.detail || 'Failed to create reservation');
+      
+      // Use our helper function to get a clean error message
+      const errorMessage = getErrorMessage(err);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -100,7 +156,7 @@ function AddReservationForm({ onSuccess, onCancel }) {
         Create New Reservation
       </h3>
       
-      {error && (
+      {error && typeof error === 'string' && (
         <div className="mb-4 bg-red-50 p-4 rounded-md">
           <div className="flex">
             <div className="flex-shrink-0">
@@ -156,7 +212,9 @@ function AddReservationForm({ onSuccess, onCancel }) {
         
         <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="check_in" className="block text-sm font-medium text-gray-700">Check-in Date/Time</label>
+            <label htmlFor="check_in" className="block text-sm font-medium text-gray-700">
+              Check-in Date/Time
+            </label>
             <input
               type="datetime-local"
               id="check_in"
@@ -169,7 +227,9 @@ function AddReservationForm({ onSuccess, onCancel }) {
           </div>
           
           <div>
-            <label htmlFor="check_out" className="block text-sm font-medium text-gray-700">Check-out Date/Time</label>
+            <label htmlFor="check_out" className="block text-sm font-medium text-gray-700">
+              Check-out Date/Time
+            </label>
             <input
               type="datetime-local"
               id="check_out"
@@ -179,6 +239,7 @@ function AddReservationForm({ onSuccess, onCancel }) {
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               required
             />
+            <p className="mt-1 text-xs text-gray-500">Must be after check-in date/time</p>
           </div>
         </div>
         

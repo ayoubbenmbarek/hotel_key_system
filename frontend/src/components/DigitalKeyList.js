@@ -1,5 +1,6 @@
 // frontend/src/components/DigitalKeyList.js
 import React, { useState } from 'react';
+import { KeyEventsModal } from './KeyEventsList';
 
 function DigitalKeyList({
   keys,
@@ -12,12 +13,14 @@ function DigitalKeyList({
   onRefresh
 }) {
   const [selectedKey, setSelectedKey] = useState(null);
+  const [viewingKeyId, setViewingKeyId] = useState(null);
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
   const [extendDate, setExtendDate] = useState('');
   const [extendTime, setExtendTime] = useState('12:00');
   const [processingKey, setProcessingKey] = useState(false);
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
@@ -86,6 +89,10 @@ function DigitalKeyList({
     const defaultTime = new Date(validUntil);
     // Format as HH:MM
     return `${String(defaultTime.getHours()).padStart(2, '0')}:${String(defaultTime.getMinutes()).padStart(2, '0')}`;
+  };
+
+  const handleViewKeyEvents = (keyId) => {
+    setViewingKeyId(keyId);
   };
 
   if (loading) {
@@ -189,6 +196,14 @@ function DigitalKeyList({
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap justify-end space-x-2">
+                {/* View Key History button - For both staff and guests */}
+                <button
+                  onClick={() => handleViewKeyEvents(key.id)}
+                  className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  View History
+                </button>
+
                 {key.is_active && (
                   <button
                     onClick={() => handleDeactivate(key.id)}
@@ -330,6 +345,13 @@ function DigitalKeyList({
           </div>
         </div>
       )}
+
+      {/* Key Events Modal */}
+      <KeyEventsModal 
+        keyId={viewingKeyId} 
+        isOpen={viewingKeyId !== null}
+        onClose={() => setViewingKeyId(null)} 
+      />
     </div>
   );
 }

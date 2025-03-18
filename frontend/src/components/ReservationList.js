@@ -1,13 +1,16 @@
 // frontend/src/components/ReservationList.js
 import React, { useState } from 'react';
+import ReservationDetails from './ReservationDetails';
 
-function ReservationList({ reservations, loading, onCreateKey, isStaff, onRefresh }) {
+function ReservationList({ reservations, loading, onCreateKey, isStaff, onRefresh, onAddReservation }) {
   const [selectedReservation, setSelectedReservation] = useState(null);
+  const [viewingReservationId, setViewingReservationId] = useState(null);
   const [creatingKey, setCreatingKey] = useState(false);
   const [passType, setPassType] = useState('apple');
   const [sendEmail, setSendEmail] = useState(true);
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
@@ -22,6 +25,10 @@ function ReservationList({ reservations, loading, onCreateKey, isStaff, onRefres
     } finally {
       setCreatingKey(false);
     }
+  };
+
+  const handleViewDetails = (reservationId) => {
+    setViewingReservationId(reservationId);
   };
 
   if (loading) {
@@ -51,15 +58,28 @@ function ReservationList({ reservations, loading, onCreateKey, isStaff, onRefres
             Your current and upcoming hotel reservations
           </p>
         </div>
-        <button
-          onClick={onRefresh}
-          className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-        >
-          <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Refresh
-        </button>
+        <div className="flex space-x-2">
+          {isStaff && (
+            <button
+              onClick={onAddReservation}
+              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              New Reservation
+            </button>
+          )}
+          <button
+            onClick={onRefresh}
+            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
+        </div>
       </div>
       
       {!reservations || reservations.length === 0 ? (
@@ -119,28 +139,26 @@ function ReservationList({ reservations, loading, onCreateKey, isStaff, onRefres
                 </div>
               </div>
               <div className="mt-4 flex justify-end space-x-3">
+                <button
+                  onClick={() => handleViewDetails(reservation.id)}
+                  className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  View Details
+                </button>
+                
                 {(reservation.status === 'confirmed' || reservation.status === 'checked_in') && (
                   <button
                     onClick={() => setSelectedReservation(reservation.id)}
                     className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
+                    <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                    </svg>
                     Create Digital Key
-                  </button>
-                )}
-                
-                {isStaff && reservation.status === 'confirmed' && (
-                  <button
-                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    Check In Guest
-                  </button>
-                )}
-                
-                {isStaff && reservation.status === 'checked_in' && (
-                  <button
-                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    Check Out Guest
                   </button>
                 )}
               </div>
@@ -232,6 +250,26 @@ function ReservationList({ reservations, loading, onCreateKey, isStaff, onRefres
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reservation Details Modal */}
+      {viewingReservationId && (
+        <div className="fixed z-10 inset-0 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
+              <ReservationDetails 
+                reservationId={viewingReservationId}
+                onClose={() => setViewingReservationId(null)}
+                onUpdate={onRefresh}
+                isStaff={isStaff}
+              />
             </div>
           </div>
         </div>

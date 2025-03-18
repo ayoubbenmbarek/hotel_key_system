@@ -109,17 +109,13 @@ def create_apple_wallet_pass(pass_data, db=None):
                     
                     "labelColor": "rgb(255, 255, 255)",
                     "logoText": settings.HOTEL_NAME,
-                    # TODO: test update checkout date in real time in pc laptop:
-                    # TODO add logo expired after some time
                     # TODO add ads in wallet for customers
-                    # TODO add frontend for admin and staff to manipulate cards and reservations
-                    # TODO checks if email sent successfully otherwise send with ather email or retry
                     # TODO: send link contains two ad to wallet android and apple
                     # Locations configuration
                     "locations": [
                         {
-                            "longitude": -122.3748889,
-                            "latitude": 37.6189722,
+                            "longitude": 43.5483,
+                            "latitude": 7.1216,
                             "relevantText": "Welcome to Palacio Holding Hotel! Your digital key is ready to use."
                         }
                     ],
