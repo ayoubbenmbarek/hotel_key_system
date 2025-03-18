@@ -1,13 +1,14 @@
 # backend/app/dependencies.py
 from typing import Generator
 
-from fastapi import Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import Depends, HTTPException, status, Path
+from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
 from app.security import get_current_user, get_current_active_staff, get_current_active_admin
 from app.models.user import User
 from app.models.hotel import Hotel
+from app.models.room import Room
 from app.models.reservation import Reservation
 
 
@@ -44,18 +45,28 @@ def get_current_user_hotel(
 
 
 def get_reservation_or_404(
-    reservation_id: str,
+    reservation_id: str = Path(...),
     db: Session = Depends(get_db)
 ) -> Reservation:
-    """
-    Get a reservation by ID or raise 404
-    """
-    reservation = db.query(Reservation).filter(Reservation.id == reservation_id).first()
+    """Get a reservation by ID or raise 404"""
+    query = db.query(Reservation).options(
+        joinedload(Reservation.room).joinedload(Room.hotel)
+    )
+    
+    reservation = query.filter(Reservation.id == reservation_id).first()
+    
     if not reservation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Reservation not found"
         )
+    
+    # Debug prints
+    print(f"Reservation found: {reservation.id}")
+    print(f"Room data: {reservation.room}")
+    if reservation.room:
+        print(f"Hotel data: {reservation.room.hotel}")
+    
     return reservation
 
 

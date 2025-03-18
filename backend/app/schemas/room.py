@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
+from app.schemas.hotel import Hotel
 from app.models.room import RoomType
 
 
@@ -37,6 +38,7 @@ class Room(RoomBase):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    hotel: Optional[Hotel] = None
     
     model_config = {
         "from_attributes": True

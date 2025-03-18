@@ -3,6 +3,7 @@ from pydantic import BaseModel, field_validator, ValidationInfo
 from typing import Optional, List
 from datetime import datetime
 
+from app.schemas.room import Room
 from app.models.reservation import ReservationStatus
 
 
@@ -56,7 +57,7 @@ class Reservation(ReservationBase):
     status: ReservationStatus
     created_at: datetime
     updated_at: datetime
-    # room: Optional[RoomSchema] TODO set up this later to show room number in reservation
+    room: Optional[Room] = None
     
     model_config = {
         "from_attributes": True

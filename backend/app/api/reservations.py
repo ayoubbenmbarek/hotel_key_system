@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 
 from app.db.session import get_db
@@ -84,6 +84,36 @@ def create_reservation(
     return reservation
 
 
+# @router.get("", response_model=List[ReservationSchema])
+# def read_reservations(
+#     db: Session = Depends(get_db),
+#     skip: int = 0,
+#     limit: int = 100,
+#     status: List[str] = Query(None),
+#     current_user: User = Depends(get_current_user)
+# ) -> Any:
+#     """
+#     Retrieve reservations
+    
+#     Staff can see all reservations, guests can only see their own
+#     """
+#     query = db.query(Reservation)
+    
+#     # Filter by status if provided
+#     if status:
+#         query = query.filter(Reservation.status.in_(status))
+    
+#     # For non-staff users, only show their own reservations
+#     if current_user.role not in ["admin", "hotel_staff"]:
+#         query = query.filter(Reservation.user_id == current_user.id)
+    
+#     # Order by check-in date (soonest first)
+#     query = query.order_by(Reservation.check_in.desc())
+    
+#     reservations = query.offset(skip).limit(limit).all()
+#     return reservations
+
+# with hotel and room
 @router.get("", response_model=List[ReservationSchema])
 def read_reservations(
     db: Session = Depends(get_db),
@@ -93,21 +123,20 @@ def read_reservations(
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
-    Retrieve reservations
-    
-    Staff can see all reservations, guests can only see their own
+    Retrieve reservations with room and hotel information
     """
-    query = db.query(Reservation)
+    # Use joinedload to eagerly load the room and hotel relationships
+    query = db.query(Reservation).options(
+        joinedload(Reservation.room).joinedload(Room.hotel)
+    )
     
-    # Filter by status if provided
+    # Rest of the function remains the same
     if status:
         query = query.filter(Reservation.status.in_(status))
     
-    # For non-staff users, only show their own reservations
     if current_user.role not in ["admin", "hotel_staff"]:
         query = query.filter(Reservation.user_id == current_user.id)
     
-    # Order by check-in date (soonest first)
     query = query.order_by(Reservation.check_in.desc())
     
     reservations = query.offset(skip).limit(limit).all()
