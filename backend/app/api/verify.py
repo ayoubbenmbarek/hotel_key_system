@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+import pytz
 
 from app.db.session import get_db
 from app.models.digital_key import DigitalKey, KeyEvent
@@ -27,12 +28,13 @@ def verify_key(
     This endpoint is called by the door lock system to verify if a key is valid
     """
     # Find key by UUID
-    print(verification.key_uuid)
-    print(DigitalKey.key_uuid)
     key = db.query(DigitalKey).filter(DigitalKey.key_uuid == verification.key_uuid).first()
 
     # Create event record
-    now = datetime.now(timezone.utc)
+    local_tz = pytz.timezone('Europe/Paris')
+    now = datetime.now(local_tz)
+    
+    # Create event record
     event = KeyEvent(
         key_id=key.id if key else None,
         event_type="access_attempt",
@@ -56,7 +58,7 @@ def verify_key(
             "is_valid": False,
             "message": "Key not found"
         }
-    
+
     # Check if key is active
     if not key.is_active:
         event.status = "failure"
@@ -68,9 +70,22 @@ def verify_key(
             "is_valid": False,
             "message": "Key is inactive"
         }
-    
+
+    # For key validation
+    valid_from = key.valid_from
+    valid_until = key.valid_until
+
     # Check key validity period
-    if now < key.valid_from or now > key.valid_until:
+    # If dates from database don't have timezone info
+    if valid_from.tzinfo is None:
+        # First convert to datetime with local timezone
+        valid_from = local_tz.localize(valid_from)
+        
+    if valid_until.tzinfo is None:
+        # First convert to datetime with local timezone  
+        valid_until = local_tz.localize(valid_until)
+
+    if now < valid_from or now > valid_until:
         event.status = "failure"
         event.details = "Key outside validity period"
         db.add(event)

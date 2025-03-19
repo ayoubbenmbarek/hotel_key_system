@@ -207,8 +207,8 @@ class NFCSimulator:
             except Exception as e:
                 print(f"Error: {str(e)}")
         
-        if close_db:
-            db.close()
+        # if close_db:
+        #     db.close()
 
 
 def parse_arguments():

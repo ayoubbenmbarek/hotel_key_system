@@ -1,18 +1,26 @@
 // frontend/src/components/StaffPanel.js
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 import { API_URL } from '../config';
 import DeviceRegistrationsList from './DeviceRegistrationsList';
 
-function StaffPanel({ user, onRefreshReservations, onRefreshKeys, onAddUser }) {
-  const [hotels, setHotels] = useState([]);
-  const [rooms, setRooms] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+function StaffPanel({ 
+  user, 
+  staffData = { hotels: [], rooms: [], users: [] }, 
+  onRefreshData,
+  onAddUser, 
+  onAddHotel, 
+  onAddRoom,
+  onToggleHotelStatus,
+  onToggleRoomStatus
+}) {
+  const [loading, setLoading] = useState(false);
   const [activeSection, setActiveSection] = useState('users');
   const [error, setError] = useState('');
   const [editingUser, setEditingUser] = useState(null);
   const [processingUser, setProcessingUser] = useState(null);
+  const [processingHotel, setProcessingHotel] = useState(null);
+  const [processingRoom, setProcessingRoom] = useState(null);
   
   // Form state for user editing
   const [editForm, setEditForm] = useState({
@@ -23,63 +31,10 @@ function StaffPanel({ user, onRefreshReservations, onRefreshKeys, onAddUser }) {
     is_active: true
   });
 
-  // Fetch staff panel data
-  useEffect(() => {
-    fetchData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.role]);
-
-  const fetchData = async () => {
-    setLoading(true);
-    setError('');
-    const token = localStorage.getItem('token');
-    
-    // Make sure we have a valid token
-    if (!token) {
-      setError('Authentication token missing. Please log in again.');
-      setLoading(false);
-      return;
-    }
-    
-    try {
-      console.log('Fetching data for staff panel...');
-      // Fetch users (admin only)
-      if (user.role === 'admin') {
-        console.log('Fetching users...');
-        try {
-          const usersResponse = await axios.get(`${API_URL}/users`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          console.log('Users data:', usersResponse.data);
-          setUsers(Array.isArray(usersResponse.data) ? usersResponse.data : []);
-        } catch (userErr) {
-          console.error('Error fetching users:', userErr);
-          // Don't fail the whole component if just user fetching fails
-        }
-      }
-      
-      // Fetch hotels
-      console.log('Fetching hotels...');
-      const hotelsResponse = await axios.get(`${API_URL}/hotels`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      console.log('Hotels data:', hotelsResponse.data);
-      setHotels(Array.isArray(hotelsResponse.data) ? hotelsResponse.data : []);
-      
-      // Fetch rooms
-      console.log('Fetching rooms...');
-      const roomsResponse = await axios.get(`${API_URL}/rooms`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      console.log('Rooms data:', roomsResponse.data);
-      setRooms(Array.isArray(roomsResponse.data) ? roomsResponse.data : []);
-      
-    } catch (err) {
-      console.error('Error fetching staff data:', err);
-      setError(`Error loading data: ${err.response?.data?.detail || err.message}`);
-    } finally {
-      setLoading(false);
-    }
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
   const handleToggleUserActive = async (userId, currentStatus) => {
@@ -94,16 +49,11 @@ function StaffPanel({ user, onRefreshReservations, onRefreshKeys, onAddUser }) {
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       
-      // Update the local user list
-      setUsers(users.map(user => {
-        if (user.id === userId) {
-          return { ...user, is_active: !currentStatus };
-        }
-        return user;
-      }));
-      
       // Show success message
       alert(`User ${!currentStatus ? 'activated' : 'deactivated'} successfully`);
+      
+      // Refresh the data
+      if (onRefreshData) onRefreshData();
     } catch (err) {
       console.error('Error updating user:', err);
       alert(`Failed to ${currentStatus ? 'deactivate' : 'activate'} user: ${err.response?.data?.detail || err.message}`);
@@ -149,19 +99,14 @@ function StaffPanel({ user, onRefreshReservations, onRefreshKeys, onAddUser }) {
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       
-      // Update the local user list
-      setUsers(users.map(user => {
-        if (user.id === editingUser) {
-          return { ...user, ...editForm };
-        }
-        return user;
-      }));
-      
       // Reset editing state
       setEditingUser(null);
       
       // Show success message
       alert('User updated successfully');
+      
+      // Refresh the data
+      if (onRefreshData) onRefreshData();
     } catch (err) {
       console.error('Error updating user:', err);
       alert(`Failed to update user: ${err.response?.data?.detail || err.message}`);
@@ -169,6 +114,30 @@ function StaffPanel({ user, onRefreshReservations, onRefreshKeys, onAddUser }) {
       setProcessingUser(null);
     }
   };
+
+  const handleHotelStatusToggle = async (hotelId, currentStatus) => {
+    setProcessingHotel(hotelId);
+    try {
+      if (onToggleHotelStatus) {
+        await onToggleHotelStatus(hotelId, currentStatus);
+      }
+    } finally {
+      setProcessingHotel(null);
+    }
+  };
+
+  const handleRoomStatusToggle = async (roomId, currentStatus) => {
+    setProcessingRoom(roomId);
+    try {
+      if (onToggleRoomStatus) {
+        await onToggleRoomStatus(roomId, currentStatus);
+      }
+    } finally {
+      setProcessingRoom(null);
+    }
+  };
+
+  const { hotels, rooms, users } = staffData;
 
   if (loading) {
     return (
@@ -198,7 +167,7 @@ function StaffPanel({ user, onRefreshReservations, onRefreshKeys, onAddUser }) {
           <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Data</h3>
           <p className="text-gray-500">{error}</p>
           <button 
-            onClick={() => fetchData()} 
+            onClick={onRefreshData} 
             className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
           >
             Refresh
@@ -456,6 +425,7 @@ function StaffPanel({ user, onRefreshReservations, onRefreshKeys, onAddUser }) {
             <div className="mb-4 flex justify-between items-center">
               <h2 className="text-lg font-medium text-gray-900">Hotel Management</h2>
               <button
+                onClick={onAddHotel}
                 className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -511,13 +481,20 @@ function StaffPanel({ user, onRefreshReservations, onRefreshKeys, onAddUser }) {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button className="text-indigo-600 hover:text-indigo-900 mr-3">
+                          <button 
+                            className="text-indigo-600 hover:text-indigo-900 mr-3"
+                          >
                             Edit
                           </button>
-                          <button className={`${
-                            hotel.is_active ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'
-                          }`}>
-                            {hotel.is_active ? 'Deactivate' : 'Activate'}
+                          <button 
+                            onClick={() => handleHotelStatusToggle(hotel.id, hotel.is_active)}
+                            className={`${
+                              hotel.is_active ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'
+                            }`}
+                            disabled={processingHotel === hotel.id}
+                          >
+                            {processingHotel === hotel.id ? 'Processing...' : 
+                             (hotel.is_active ? 'Deactivate' : 'Activate')}
                           </button>
                         </td>
                       </tr>
@@ -540,6 +517,7 @@ function StaffPanel({ user, onRefreshReservations, onRefreshKeys, onAddUser }) {
             <div className="mb-4 flex justify-between items-center">
               <h2 className="text-lg font-medium text-gray-900">Room Management</h2>
               <button
+                onClick={onAddRoom}
                 className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -602,13 +580,20 @@ function StaffPanel({ user, onRefreshReservations, onRefreshKeys, onAddUser }) {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button className="text-indigo-600 hover:text-indigo-900 mr-3">
+                          <button 
+                            className="text-indigo-600 hover:text-indigo-900 mr-3"
+                          >
                             Edit
                           </button>
-                          <button className={`${
-                            room.is_active ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'
-                          }`}>
-                            {room.is_active ? 'Deactivate' : 'Activate'}
+                          <button 
+                            onClick={() => handleRoomStatusToggle(room.id, room.is_active)}
+                            className={`${
+                              room.is_active ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'
+                            }`}
+                            disabled={processingRoom === room.id}
+                          >
+                            {processingRoom === room.id ? 'Processing...' : 
+                             (room.is_active ? 'Deactivate' : 'Activate')}
                           </button>
                         </td>
                       </tr>

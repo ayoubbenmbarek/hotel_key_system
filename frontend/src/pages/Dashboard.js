@@ -10,6 +10,8 @@ import UserProfile from '../components/UserProfile';
 import StaffPanel from '../components/StaffPanel';
 import AddReservationForm from '../components/AddReservationForm';
 import AddUserForm from '../components/AddUserForm';
+import AddHotelForm from '../components/AddHotelForm';
+import AddRoomForm from '../components/AddRoomForm';
 import { API_URL } from '../config';
 
 import { ToastContainer, toast } from 'react-toastify';
@@ -25,6 +27,13 @@ function Dashboard() {
   const [keysLoading, setKeysLoading] = useState(false);
   const [showAddUser, setShowAddUser] = useState(false);
   const [showAddReservation, setShowAddReservation] = useState(false);
+  const [showAddHotel, setShowAddHotel] = useState(false);
+  const [showAddRoom, setShowAddRoom] = useState(false);
+  const [staffData, setStaffData] = useState({
+    hotels: [],
+    rooms: [],
+    users: []
+  });
   const navigate = useNavigate();
   
   // Use refs to prevent infinite request loops
@@ -153,6 +162,46 @@ function Dashboard() {
     fetchUserKeys(); // Reuse the same function for simplicity
   }, [fetchUserKeys]);
 
+  const fetchStaffData = useCallback(async () => {
+    if (!user || !['admin', 'hotel_staff'].includes(user.role)) return;
+    
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    
+    try {
+      // Fetch hotels
+      const hotelsResponse = await axios.get(`${API_URL}/hotels`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const hotels = extractArrayData(hotelsResponse.data);
+      
+      // Fetch rooms
+      const roomsResponse = await axios.get(`${API_URL}/rooms`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const rooms = extractArrayData(roomsResponse.data);
+      
+      // Fetch users (admin only)
+      let users = [];
+      if (user.role === 'admin') {
+        const usersResponse = await axios.get(`${API_URL}/users`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        users = extractArrayData(usersResponse.data);
+      }
+      
+      setStaffData({
+        hotels,
+        rooms,
+        users
+      });
+      
+    } catch (err) {
+      console.error('Error fetching staff data:', err);
+      toast.error('Failed to load staff data: ' + (err.response?.data?.detail || err.message));
+    }
+  }, [user, extractArrayData]);
+
   // Persist user data in local storage
   const persistUserData = useCallback((userData) => {
     if (userData) {
@@ -239,9 +288,10 @@ function Dashboard() {
       } else if (['admin', 'hotel_staff'].includes(user.role)) {
         fetchAllReservations();
         fetchAllKeys();
+        fetchStaffData();
       }
     }
-  }, [user, fetchUserReservations, fetchUserKeys, fetchAllReservations, fetchAllKeys]);
+  }, [user, fetchUserReservations, fetchUserKeys, fetchAllReservations, fetchAllKeys, fetchStaffData]);
 
   // Update the user state when UserProfile makes changes
   const handleUserUpdate = (updatedUser) => {
@@ -412,19 +462,8 @@ function Dashboard() {
     toast.success('User created successfully');
     setShowAddUser(false);
     
-    // Refresh the data if needed
-    if (['admin', 'hotel_staff'].includes(user?.role)) {
-      // Refresh users data if on the staff panel
-      if (activeTab === 'staff') {
-        // Since there's no dedicated fetch users function, 
-        // we'll just reload the whole component
-        initialDataLoaded.current = false;
-        
-        // Refresh the staff panel data
-        fetchAllReservations();
-        fetchAllKeys();
-      }
-    }
+    // Refresh the data
+    fetchStaffData();
   };
 
   // Handle adding a new reservation
@@ -434,6 +473,67 @@ function Dashboard() {
     
     // Refresh the reservations list
     fetchAllReservations();
+  };
+
+  // Handle adding a new hotel
+  const handleAddHotel = (newHotel) => {
+    toast.success('Hotel created successfully');
+    setShowAddHotel(false);
+    
+    // Refresh the staff data
+    fetchStaffData();
+  };
+
+  // Handle adding a new room
+  const handleAddRoom = (newRoom) => {
+    toast.success('Room created successfully');
+    setShowAddRoom(false);
+    
+    // Refresh the staff data
+    fetchStaffData();
+  };
+
+  // Handle updating hotel status
+  const handleToggleHotelStatus = async (hotelId, currentStatus) => {
+    const token = localStorage.getItem('token');
+    
+    try {
+      // Call API to update hotel status
+      await axios.put(
+        `${API_URL}/hotels/${hotelId}`,
+        { is_active: !currentStatus },
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      
+      toast.success(`Hotel ${currentStatus ? 'deactivated' : 'activated'} successfully`);
+      
+      // Refresh staff data
+      fetchStaffData();
+    } catch (err) {
+      console.error('Error updating hotel status:', err);
+      toast.error(`Failed to ${currentStatus ? 'deactivate' : 'activate'} hotel: ${err.response?.data?.detail || err.message}`);
+    }
+  };
+
+  // Handle updating room status
+  const handleToggleRoomStatus = async (roomId, currentStatus) => {
+    const token = localStorage.getItem('token');
+    
+    try {
+      // Call API to update room status
+      await axios.delete(
+        `${API_URL}/rooms/${roomId}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      
+      toast.success(`Room ${currentStatus ? 'deactivated' : 'activated'} successfully`);
+      
+      // Refresh staff data
+      fetchStaffData();
+    } catch (err) {
+      console.error('Error updating room status:', err);
+      toast.error(`Failed to ${currentStatus ? 'deactivate' : 'activate'} room: ${err.response?.data?.detail || err.message}`);
+    }
   };
 
   if (loading) {
@@ -496,10 +596,14 @@ function Dashboard() {
             
             {activeTab === 'staff' && ['admin', 'hotel_staff'].includes(user?.role) && (
               <StaffPanel 
-                user={user} 
-                onRefreshReservations={fetchAllReservations}
-                onRefreshKeys={fetchAllKeys}
+                user={user}
+                staffData={staffData}
+                onRefreshData={fetchStaffData}
                 onAddUser={() => setShowAddUser(true)}
+                onAddHotel={() => setShowAddHotel(true)}
+                onAddRoom={() => setShowAddRoom(true)}
+                onToggleHotelStatus={handleToggleHotelStatus}
+                onToggleRoomStatus={handleToggleRoomStatus}
               />
             )}
           </div>
@@ -536,6 +640,42 @@ function Dashboard() {
               <AddReservationForm 
                 onSuccess={handleAddReservation} 
                 onCancel={() => setShowAddReservation(false)} 
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Hotel Modal */}
+      {showAddHotel && (
+        <div className="fixed z-10 inset-0 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <AddHotelForm 
+                onSuccess={handleAddHotel} 
+                onCancel={() => setShowAddHotel(false)} 
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Room Modal */}
+      {showAddRoom && (
+        <div className="fixed z-10 inset-0 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <AddRoomForm 
+                onSuccess={handleAddRoom} 
+                onCancel={() => setShowAddRoom(false)} 
               />
             </div>
           </div>
