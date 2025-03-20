@@ -14,9 +14,9 @@ function StaffPanel({
   onToggleHotelStatus,
   onToggleRoomStatus
 }) {
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [activeSection, setActiveSection] = useState('users');
-  const [error, setError] = useState('');
+  const [error] = useState('');
   const [editingUser, setEditingUser] = useState(null);
   const [processingUser, setProcessingUser] = useState(null);
   const [processingHotel, setProcessingHotel] = useState(null);
@@ -31,11 +31,11 @@ function StaffPanel({
     is_active: true
   });
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
-  };
+  // const formatDate = (dateString) => {
+  //   if (!dateString) return 'N/A';
+  //   const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+  //   return new Date(dateString).toLocaleDateString(undefined, options);
+  // };
 
   const handleToggleUserActive = async (userId, currentStatus) => {
     setProcessingUser(userId);

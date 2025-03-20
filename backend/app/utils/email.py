@@ -90,12 +90,17 @@ def send_email(
                     msg.attach(image)
         
         # Connect to SMTP server and send email
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-            if settings.SMTP_TLS:
-                server.starttls()
+        # ERROR - Failed to send email: [Errno 111] Connection refused
+        # with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        #     if settings.SMTP_TLS:
+        #         server.starttls()
             
-            if settings.SMTP_USER and settings.SMTP_PASSWORD:
-                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        #     if settings.SMTP_USER and settings.SMTP_PASSWORD:
+        #         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login("ayoubenmbarek@gmail.com", "uojt dktu yfrw vrdn")
+            # server.send_message(msg)
             
             # Determine all recipients
             recipients = [email_to] if isinstance(email_to, str) else email_to
@@ -167,6 +172,79 @@ def send_welcome_email(email_to: str, first_name: str) -> bool:
     
     Thank you for registering with {settings.HOTEL_NAME}. We're excited to have you as our guest.
     
+    Best regards,
+    The {settings.HOTEL_NAME} Team
+    """
+
+    return send_email(
+        email_to=email_to,
+        subject=subject,
+        html_content=html_content,
+        text_content=text_content
+    )
+
+
+def send_password_reset_email(email_to: str, first_name: str, reset_token: str) -> bool:
+    """
+    Send a password reset email with a link containing the reset token.
+    
+    Args:
+        email_to: The recipient's email address
+        first_name: The recipient's first name
+        reset_token: The password reset token
+        
+    Returns:
+        bool: Whether the email was sent successfully
+    """
+    # Build the reset link
+    reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
+    
+    subject = f"Reset Your Password - {settings.HOTEL_NAME}"
+    
+    # Set a default logo URL if none is configured
+    hotel_logo_url = settings.HOTEL_LOGO_URL or ""
+    
+    # Try to use a template if available
+    html_content = render_template(
+        "password_reset_email.html",
+        first_name=first_name,
+        reset_link=reset_link,
+        hotel_name=settings.HOTEL_NAME,
+        hotel_logo_url=hotel_logo_url,
+        expiry_hours=24,
+        current_year=datetime.now().year
+    )
+    
+    # If template rendering failed, use this fallback HTML
+    if not html_content:
+        html_content = f"""
+        <html>
+            <body>
+                <h1>Hello, {first_name}!</h1>
+                <p>We received a request to reset your password for the {settings.HOTEL_NAME} Virtual Key System.</p>
+                <p>To reset your password, please click on the link below:</p>
+                <p><a href="{reset_link}">Reset Password</a></p>
+                <p>This link will expire in 24 hours.</p>
+                <p>If you did not request a password reset, please ignore this email or contact support if you have concerns.</p>
+                <p>Best regards,<br>The {settings.HOTEL_NAME} Team</p>
+            </body>
+        </html>
+        """
+
+    text_content = f"""
+    Password Reset - {settings.HOTEL_NAME}
+
+    Hello {first_name},
+
+    We received a request to reset your password for the {settings.HOTEL_NAME} Virtual Key System.
+
+    To reset your password, please visit this link:
+    {reset_link}
+
+    This link will expire in 24 hours.
+
+    If you did not request a password reset, please ignore this email or contact support if you have concerns.
+
     Best regards,
     The {settings.HOTEL_NAME} Team
     """

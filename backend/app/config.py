@@ -68,12 +68,12 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: List[str] = ["*"]
     
     # Email settings
-    SMTP_TLS: bool = True
+    SMTP_TLS: bool = get_env("SMTP_TLS", "True")
     SMTP_PORT: Optional[int] = 587
     SMTP_HOST: Optional[str] = get_env("SMTP_HOST", "smtp.gmail.com")
-    SMTP_USER: Optional[str] = get_env("SMTP_USER")
-    SMTP_PASSWORD: Optional[str] = get_env("SMTP_PASSWORD")
-    EMAILS_FROM_EMAIL: Optional[EmailStr] = get_env("EMAILS_FROM_EMAIL", "info@example.com")
+    SMTP_USER: Optional[str] = get_env("SMTP_USER", "ayoubenmbarek@gmail.com")
+    SMTP_PASSWORD: Optional[str] = get_env("SMTP_PASSWORD", "uojt dktu yfrw vrdn")
+    EMAILS_FROM_EMAIL: Optional[EmailStr] = get_env("EMAILS_FROM_EMAIL", "ayoubenmbarek@gmail.com")
     EMAILS_FROM_NAME: Optional[str] = get_env("EMAILS_FROM_NAME", "Hotel Key System")
     
     # Wallet pass settings
@@ -93,7 +93,7 @@ class Settings(BaseSettings):
     
     # Frontend URLs
     FRONTEND_URL: str = get_env("FRONTEND_URL", "http://localhost:3000")
-    PASS_BASE_URL: str = get_env("PASS_BASE_URL", "https://8f35-2a01-e0a-159-2b50-59fa-aa12-df1c-1016.ngrok-free.app/api/v1/passes/")
+    PASS_BASE_URL: str = get_env("PASS_BASE_URL", "https://166e-2a01-e0a-159-2b50-d852-e24a-103a-1ec0.ngrok-free.app/api/v1/passes/")
     
     model_config = SettingsConfigDict(
         env_file=".env",

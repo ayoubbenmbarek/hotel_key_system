@@ -30,7 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger("nfc_simulator")
 
 # Default configuration
-DEFAULT_API_URL = "https://8f35-2a01-e0a-159-2b50-59fa-aa12-df1c-1016.ngrok-free.app/api/v1"
+DEFAULT_API_URL = "https://166e-2a01-e0a-159-2b50-d852-e24a-103a-1ec0.ngrok-free.app/api/v1"
 DEFAULT_LOCK_ID = "LOCK-A123B456"
 DEFAULT_DEVICE_INFO = "NFC Simulator v1.0"
 DEFAULT_LOCATION = "Main Entrance"

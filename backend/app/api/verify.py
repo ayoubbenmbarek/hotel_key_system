@@ -80,9 +80,9 @@ def verify_key(
     if valid_from.tzinfo is None:
         # First convert to datetime with local timezone
         valid_from = local_tz.localize(valid_from)
-        
+
     if valid_until.tzinfo is None:
-        # First convert to datetime with local timezone  
+        # First convert to datetime with local timezone
         valid_until = local_tz.localize(valid_until)
 
     if now < valid_from or now > valid_until:
@@ -90,12 +90,12 @@ def verify_key(
         event.details = "Key outside validity period"
         db.add(event)
         db.commit()
-        
+
         return {
             "is_valid": False,
             "message": "Key outside validity period"
         }
-    
+
     # Get reservation and room info
     reservation = db.query(Reservation).filter(
         Reservation.id == key.reservation_id

@@ -1,57 +1,3 @@
-# # backend/app/api/auth.py
-# from datetime import timedelta
-# from typing import Any
-
-# from fastapi import APIRouter, Depends, HTTPException, status
-# from fastapi.security import OAuth2PasswordRequestForm
-# from sqlalchemy.orm import Session
-
-# from app.db.session import get_db
-# from app.security import create_access_token, verify_password
-# from app.models.user import User
-# from app.schemas.user import Token
-# from app.config import settings
-
-# router = APIRouter()
-
-
-# @router.post("/login", response_model=Token)
-# def login_access_token(
-#     db: Session = Depends(get_db), 
-#     form_data: OAuth2PasswordRequestForm = Depends()
-# ) -> Any:
-#     """
-#     OAuth2 compatible token login, get an access token for future requests
-#     """
-#     # Find user by email
-#     user = db.query(User).filter(User.email == form_data.username).first()
-    
-#     # Validate user and password
-#     if not user or not verify_password(form_data.password, user.hashed_password):
-#         raise HTTPException(
-#             status_code=status.HTTP_401_UNAUTHORIZED,
-#             detail="Incorrect email or password",
-#             headers={"WWW-Authenticate": "Bearer"},
-#         )
-    
-#     # Check if user is active
-#     if not user.is_active:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST, 
-#             detail="Inactive user account"
-#         )
-    
-#     # Create access token
-#     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-#     return {
-#         "access_token": create_access_token(
-#             subject=user.email, 
-#             expires_delta=access_token_expires
-#         ),
-#         "token_type": "bearer",
-#     }
-
-
 # backend/app/api/auth.py
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
@@ -68,7 +14,7 @@ from app.models.user import User, UserRole
 from app.schemas.user import Token, TokenPayload, User as UserSchema, UserCreate
 from app.config import settings
 from app.utils.validators import validate_password
-from app.utils.email import send_welcome_email
+from app.utils.email import send_welcome_email, send_password_reset_email
 
 router = APIRouter()
 
@@ -182,15 +128,15 @@ def request_password_reset(
         subject=user.email,
         expires_delta=timedelta(hours=24)
     )
-    
+
     # Send password reset email in background
     # This would be implemented in a real application
-    # background_tasks.add_task(
-    #     send_password_reset_email,
-    #     user.email,
-    #     user.first_name,
-    #     password_reset_token
-    # )
+    background_tasks.add_task(
+        send_password_reset_email,
+        user.email,
+        user.first_name,
+        password_reset_token
+    )
     
     return {"message": "If the email exists, a password reset link will be sent"}
 
@@ -210,7 +156,8 @@ def reset_password(
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         token_data = TokenPayload(**payload)
         
-        if datetime.fromtimestamp(token_data.exp) < datetime.now(timezone.utc):
+        # Use timezone-aware comparison
+        if datetime.fromtimestamp(token_data.exp, tz=timezone.utc) < datetime.now(timezone.utc):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Token has expired"

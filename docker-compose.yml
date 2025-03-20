@@ -17,13 +17,13 @@ services:
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=hotel_keys
       - SMTP_HOST=mailhog
-      - SMTP_PORT=1025
-      - SMTP_USER=
-      - SMTP_PASSWORD=
+      - SMTP_PORT=587
+      - SMTP_USER=ayoubenmbarek@gmail.com
+      - SMTP_PASSWORD="uojt dktu yfrw vrdn"
       - EMAILS_FROM_EMAIL=ayoubenmbarek@gmail.com
       - EMAILS_FROM_NAME=Your Hotel
       - FRONTEND_URL=http://localhost:3000
-      - PASS_BASE_URL=https://8f35-2a01-e0a-159-2b50-59fa-aa12-df1c-1016.ngrok-free.app/api/v1/passes
+      - PASS_BASE_URL=https://166e-2a01-e0a-159-2b50-d852-e24a-103a-1ec0.ngrok-free.app/api/v1/passes
     depends_on:
       - db
       - mailhog
@@ -67,7 +67,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - REACT_APP_API_URL=https://8f35-2a01-e0a-159-2b50-59fa-aa12-df1c-1016.ngrok-free.app/api/v1
+      - REACT_APP_API_URL=https://166e-2a01-e0a-159-2b50-d852-e24a-103a-1ec0.ngrok-free.app/api/v1
     depends_on:
       - backend
     networks:

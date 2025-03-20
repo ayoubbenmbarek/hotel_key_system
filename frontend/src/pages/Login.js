@@ -1,14 +1,16 @@
-// frontend/src/pages/Login.js
+// src/pages/Login.js - Updated version
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from '../config';
+import PasswordResetRequestForm from '../components/PasswordResetRequestForm';
 
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showResetForm, setShowResetForm] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -58,6 +60,18 @@ function Login() {
       setLoading(false);
     }
   };
+
+  if (showResetForm) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <PasswordResetRequestForm 
+            onCancel={() => setShowResetForm(false)} 
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
@@ -111,6 +125,18 @@ function Login() {
               {error}
             </div>
           )}
+
+          <div className="flex items-center justify-between">
+            <div className="text-sm">
+              <button
+                type="button"
+                onClick={() => setShowResetForm(true)}
+                className="font-medium text-indigo-600 hover:text-indigo-500"
+              >
+                Forgot your password?
+              </button>
+            </div>
+          </div>
 
           <div>
             <button
