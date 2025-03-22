@@ -1,6 +1,8 @@
 # backend/app/services/email_service.py
 import logging
 import smtplib
+import re
+import dns.resolver
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
@@ -48,8 +50,33 @@ def generate_qr_code(url):
     return buffered.getvalue()
 
 
+def validate_email(email):
+    """Basic email validation including domain check"""
+    # Check format
+    email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+    if not re.match(email_regex, email):
+        return False, "Invalid email format"
+    
+    # Check if domain exists and has MX records
+    domain = email.split('@')[1]
+    try:
+        mx_records = dns.resolver.resolve(domain, 'MX')
+        if not mx_records:
+            return False, "Domain doesn't have mail exchange servers"
+        return True, "Valid email"
+    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.resolver.NoNameservers):
+        return False, "Domain doesn't exist or can't receive emails"
+    except Exception as e:
+        return False, f"Error checking domain: {str(e)}"
+
+
 def send_key_email(recipient_email, guest_name, pass_url, key_id, pass_data, max_retries=3):
     """Send email with digital key information to guest"""
+     # First validate the email
+    is_valid, validation_message = validate_email(recipient_email)
+    if not is_valid:
+        logger.error(f"Invalid email address: {recipient_email}. {validation_message}")
+        return False, validation_message
     try:
         # Create message
         msg = MIMEMultipart('related')
@@ -128,7 +155,7 @@ def send_key_email(recipient_email, guest_name, pass_url, key_id, pass_data, max
                 #     server.send_message(msg)
                 
                 logger.info(f"Digital key email sent successfully to {recipient_email}")
-                return True
+                return True, "Email sent successfully"
             except Exception as e:
                 logger.warning(f"Email sending attempt {attempt+1} failed: {str(e)}")
                 time.sleep(2 ** attempt)  # Exponential backoff

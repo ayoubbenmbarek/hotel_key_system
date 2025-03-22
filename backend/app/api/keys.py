@@ -24,7 +24,7 @@ from app.schemas.digital_key import (
     KeyExtension,
     KeyEvent as KeyEventSchema
 )
-from app.services.email_service import send_key_email
+from app.services.email_service import send_key_email, validate_email
 from app.services.pass_update_service import update_wallet_pass_status
 
 # Configure logging
@@ -49,14 +49,14 @@ def create_digital_key(
     if not reservation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Reservation not found"
+            detail="Reservation not found. Please verify the reservation ID and try again."
         )
     
     # Verify reservation status
     if reservation.status not in [ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot create key for reservation with status: {reservation.status}"
+            detail=f"Cannot create key for reservation with status: {reservation.status}. Keys can only be created for confirmed or checked-in reservations."
         )
     
     # Get user and room info
@@ -64,15 +64,29 @@ def create_digital_key(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            detail="User not found for this reservation. The user account may have been deleted or the reservation is misconfigured."
         )
     
     room = db.query(Room).filter(Room.id == reservation.room_id).first()
     if not room:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found"
+            detail="Room not found for this reservation. The room may have been deleted or the reservation is misconfigured."
         )
+    
+    # If email will be sent, validate the email first
+    if key_in.send_email:
+        is_valid, validation_message = validate_email(user.email)
+        if not is_valid:
+            error_detail = f"Cannot create key with email option: {user.email} is invalid. {validation_message}. Please update the user's email address before creating a key with the email option."
+            
+            # Log the validation failure
+            logger.error(f"Email validation failed: {error_detail}")
+            
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_detail
+            )
     
     # Generate unique key UUID
     key_uuid = str(uuid.uuid4())
@@ -141,20 +155,45 @@ def create_digital_key(
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating wallet pass: {str(e)}"
+            detail=f"Error creating wallet pass: {str(e)}. Please try again or contact support if this error persists."
         )
     
     # Send email in background if requested
     if key_in.send_email:
         logger.info(f"Adding email task for digital key {digital_key.id} to {user.email}")
-        background_tasks.add_task(
-            send_key_email,
-            user.email,
-            f"{user.first_name} {user.last_name}",
-            pass_url,
-            digital_key.id,
-            pass_data
-        )
+        try:
+            background_tasks.add_task(
+                send_key_email,
+                user.email,
+                f"{user.first_name} {user.last_name}",
+                pass_url,
+                digital_key.id,
+                pass_data
+            )
+            
+            # Log email scheduling
+            key_event = KeyEvent(
+                key_id=digital_key.id,
+                event_type="key_email_scheduled",
+                device_info=f"API request by {current_user.email}",
+                status="success",
+                details=f"Email scheduled to be sent to {user.email}"
+            )
+            db.add(key_event)
+            db.commit()
+            
+        except Exception as e:
+            # Log email scheduling failure but don't fail the key creation
+            logger.error(f"Failed to schedule email: {str(e)}")
+            key_event = KeyEvent(
+                key_id=digital_key.id,
+                event_type="key_email_scheduling_failed",
+                device_info=f"API request by {current_user.email}",
+                status="error",
+                details=f"Failed to schedule email: {str(e)}"
+            )
+            db.add(key_event)
+            db.commit()
 
     return digital_key
 
@@ -486,7 +525,7 @@ def send_key_email_endpoint(
     if not key:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Digital key not found"
+            detail="Digital key not found. Please verify the key ID and try again."
         )
 
     # Check permissions for non-staff users
@@ -495,7 +534,7 @@ def send_key_email_endpoint(
         if not reservation or reservation.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions"
+                detail="You don't have permission to send this key. Only admins, hotel staff, or the reservation owner can perform this action."
             )
 
     # Get reservation and user info
@@ -503,21 +542,21 @@ def send_key_email_endpoint(
     if not reservation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Reservation not found for this key"
+            detail="Reservation not found for this key. The reservation may have been deleted or the key is misconfigured."
         )
     
     user = db.query(User).filter(User.id == reservation.user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found for this reservation"
+            detail="User not found for this reservation. The user account may have been deleted or the reservation is misconfigured."
         )
     
     room = db.query(Room).filter(Room.id == reservation.room_id).first()
     if not room:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Room not found for this reservation"
+            detail="Room not found for this reservation. The room may have been deleted or the reservation is misconfigured."
         )
     
     # Create pass data for email
@@ -530,6 +569,30 @@ def send_key_email_endpoint(
         "check_out": reservation.check_out.isoformat(),
         "nfc_lock_id": room.nfc_lock_id
     }
+    
+    # Check email validity before sending
+    is_valid, validation_message = validate_email(user.email)
+    if not is_valid:
+        # Create more detailed error message
+        error_detail = f"Cannot send email to {user.email}: {validation_message}. Please verify the email address is correct and active, or update the user's email to a valid address."
+        logger.error(f"Email validation failed: {error_detail}")
+        
+        # Log the email validation failure
+        event = KeyEvent(
+            key_id=key.id,
+            event_type="key_email_failed",
+            device_info=f"API request by {current_user.email}",
+            status="error",
+            details=f"Invalid email: {user.email}. {validation_message}"
+        )
+        db.add(event)
+        db.commit()
+        
+        # Return error to the frontend
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_detail
+        )
     
     # Send email in background
     background_tasks.add_task(
@@ -552,7 +615,7 @@ def send_key_email_endpoint(
     db.add(event)
     db.commit()
     
-    return {"message": f"Email with digital key sent to {user.email}"}
+    return {"message": f"Email with digital key successfully sent to {user.email}"}
 
 
 @router.get("/{key_id}/events", response_model=List[KeyEventSchema])
