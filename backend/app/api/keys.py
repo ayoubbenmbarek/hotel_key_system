@@ -26,6 +26,10 @@ from app.schemas.digital_key import (
 )
 from app.services.email_service import send_key_email, validate_email
 from app.services.pass_update_service import update_wallet_pass_status
+from app.utils.date_formatting import format_datetime
+from app.services.sms_service import validate_phone_number, send_sms
+from app.schemas.sms import SMSResponseModel
+from app.services.hotel_service import get_hotel_name
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -194,6 +198,66 @@ def create_digital_key(
             )
             db.add(key_event)
             db.commit()
+    # Send SMS if requested
+    if hasattr(key_in, 'send_sms') and key_in.send_sms and hasattr(key_in, 'phone_numbers') and key_in.phone_numbers:
+        valid_numbers = []
+        
+        # Validate phone numbers
+        for phone in key_in.phone_numbers:
+            if validate_phone_number(phone):
+                valid_numbers.append(phone)
+        
+        if valid_numbers:
+            # Create SMS content
+            hotel_name = room.hotel.name if room and hasattr(room, 'hotel') and room.hotel else get_hotel_name(db, room.hotel_id)
+            sms_content = (
+                f"Your digital key for {hotel_name} is ready. "
+                f"Room: {room.room_number}, "
+                f"Check-in: {format_datetime(reservation.check_in)}, "
+                f"Key URL: {pass_url}"
+            )
+            
+            # Send SMS to each valid number
+            success_count = 0
+            failed_numbers = []
+            
+            for phone in valid_numbers:
+                # During testing, send synchronously instead of in background
+                success, message = send_sms(phone, sms_content)
+                if not success:
+                    logger.error(f"Failed to send SMS: {message}")
+                    failed_numbers.append(phone)
+                else:
+                    # Log SMS sending success
+                    event = KeyEvent(
+                        key_id=digital_key.id,
+                        event_type="key_sms_sent",
+                        device_info=f"API request by {current_user.email}",
+                        status="success",
+                        details=f"SMS sent to {phone} for {key_in.pass_type.value} pass"
+                    )
+                    db.add(event)
+                    success_count += 1
+            
+            db.commit()
+            
+            # Prepare response
+            if success_count == len(valid_numbers):
+                return {
+                    "message": f"SMS with digital key successfully sent to {success_count} phone number(s)",
+                    "invalid_numbers": failed_numbers if failed_numbers else None
+                }
+            elif success_count > 0:
+                return {
+                    "message": f"SMS partially sent. Succeeded: {success_count}, Failed: {len(failed_numbers)}",
+                    "failed_numbers": failed_numbers,
+                    "invalid_numbers": failed_numbers if failed_numbers else None
+                }
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to send SMS to any number. Please try again later."
+                )
 
     return digital_key
 
@@ -562,7 +626,7 @@ def send_key_email_endpoint(
     # Create pass data for email
     pass_data = {
         "key_uuid": key.key_uuid,
-        "hotel_name": room.hotel.name if room.hotel else "Hotel",
+        "hotel_name": room.hotel.name if room.hotel else settings.HOTEL_NAME,
         "room_number": room.room_number,
         "guest_name": f"{user.first_name} {user.last_name}",
         "check_in": reservation.check_in.isoformat(),
@@ -617,6 +681,152 @@ def send_key_email_endpoint(
     
     return {"message": f"Email with digital key successfully sent to {user.email}"}
 
+
+@router.post("/{key_id}/send-sms", status_code=status.HTTP_200_OK, response_model=SMSResponseModel)
+def send_key_sms_endpoint(
+    *,
+    db: Session = Depends(get_db),
+    key_id: str,
+    phone_numbers: List[str],  # Accept list of phone numbers
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Send SMS with digital key pass to the user
+    """
+    # Get the digital key
+    key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Digital key not found. Please verify the key ID and try again."
+        )
+
+    # Check permissions for non-staff users
+    if current_user.role not in ["admin", "hotel_staff"]:
+        reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
+        if not reservation or reservation.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to send this key. Only admins, hotel staff, or the reservation owner can perform this action."
+            )
+
+    # Get reservation and user info
+    reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
+    if not reservation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reservation not found for this key."
+        )
+    
+    # Get the room for this reservation
+    room = db.query(Room).filter(Room.id == reservation.room_id).first()
+    if not room:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room not found for this reservation."
+        )
+    
+    # Validate phone numbers
+    valid_numbers = []
+    invalid_numbers = []
+    
+    for phone in phone_numbers:
+        if validate_phone_number(phone):
+            valid_numbers.append(phone)
+        else:
+            invalid_numbers.append(phone)
+    
+    if not valid_numbers:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No valid phone numbers provided. Invalid numbers: {', '.join(invalid_numbers)}"
+        )
+    
+    # Create SMS content
+    hotel_name = room.hotel.name if room and hasattr(room, 'hotel') and room.hotel else get_hotel_name(db, room.hotel_id)
+    sms_content = (
+        f"Your digital key for {hotel_name} is ready. "
+        f"Room: {room.room_number}, "
+        f"Check-in: {format_datetime(reservation.check_in)}, "
+        f"Key URL: {key.pass_url}"
+    )
+
+    # Send SMS to each valid number
+    success_count = 0
+    failed_numbers = []
+    
+    # Better for debug, synchronous, but it block the process
+    # for phone in valid_numbers:
+    #     # During testing, send synchronously instead of in background
+    #     success, message = send_sms(phone, sms_content)
+    #     if not success:
+    #         logger.error(f"Failed to send SMS: {message}")
+    #         failed_numbers.append(phone)
+    #     else:
+    #         # Log SMS sending success
+    #         event = KeyEvent(
+    #             key_id=key.id,
+    #             event_type="key_sms_sent",
+    #             device_info=f"API request by {current_user.email}",
+    #             status="success",
+    #             details=f"SMS sent to {phone} for {key.pass_type.value} pass"
+    #         )
+    #         db.add(event)
+    #         success_count += 1
+    # Better for production do not block the process
+    for phone in valid_numbers:
+        try:
+            background_tasks.add_task(
+                send_sms,
+                phone,
+                sms_content
+            )
+            
+            # Log SMS sending
+            event = KeyEvent(
+                key_id=key.id,
+                event_type="key_sms_sent",
+                device_info=f"API request by {current_user.email}",
+                status="success",
+                details=f"SMS sent to {phone} for {key.pass_type.value} pass"
+            )
+            db.add(event)
+            success_count += 1
+            
+        except Exception as e:
+            logger.error(f"Failed to send SMS to {phone}: {str(e)}")
+            failed_numbers.append(phone)
+            
+            # Log SMS failure
+            event = KeyEvent(
+                key_id=key.id,
+                event_type="key_sms_failed",
+                device_info=f"API request by {current_user.email}",
+                status="error", 
+                details=f"Failed to send SMS to {phone}: {str(e)}"
+            )
+            db.add(event)
+
+    db.commit()
+    
+    # Prepare response
+    if success_count == len(valid_numbers):
+        return {
+            "message": f"SMS with digital key successfully sent to {success_count} phone number(s)",
+            "invalid_numbers": invalid_numbers if invalid_numbers else None
+        }
+    elif success_count > 0:
+        return {
+            "message": f"SMS partially sent. Succeeded: {success_count}, Failed: {len(failed_numbers)}",
+            "failed_numbers": failed_numbers,
+            "invalid_numbers": invalid_numbers if invalid_numbers else None
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send SMS to any number. Please try again later."
+        )
 
 @router.get("/{key_id}/events", response_model=List[KeyEventSchema])
 def read_key_events(

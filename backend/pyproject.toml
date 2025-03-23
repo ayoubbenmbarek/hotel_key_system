@@ -27,6 +27,8 @@ requests = "^2.31.0"
 httpx = {extras = ["http2"], version = "^0.28.1"}
 PyJWT = "^2.10.1"
 pytz = "^2025.1"
+twilio = "^8.10.0"  # Added Twilio for SMS service
+vonage = "^4.4.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.1"

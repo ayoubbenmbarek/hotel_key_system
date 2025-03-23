@@ -1,5 +1,14 @@
 {
   "dependencies": {
     "react-toastify": "^11.0.5"
+  },
+  "devDependencies": {
+    "@craco/craco": "^7.1.0"
+  },
+  "scripts": {
+    "start": "craco start",
+    "build": "craco build",
+    "test": "craco test",
+    "eject": "react-scripts eject"
   }
 }

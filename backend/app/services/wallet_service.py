@@ -19,6 +19,9 @@ from app.config import settings
 from app.utils.date_formatting import format_datetime_with_timezone
 from app.models.digital_key import KeyType, DigitalKey
 from app.services.wallet_push_service import save_auth_token_to_db
+from app.db.session import SessionLocal
+from app.models.reservation import Reservation
+from app.models.room import Room
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -70,7 +73,6 @@ def create_apple_wallet_pass(pass_data, db=None):
 
         close_db = False
         if db is None:
-            from app.db.session import SessionLocal
             db = SessionLocal()
             close_db = True
         try:
@@ -79,6 +81,23 @@ def create_apple_wallet_pass(pass_data, db=None):
 
             # Save auth token to digital key
             save_auth_token_to_db(pass_data["key_uuid"], auth_token, db)
+            
+            # Get hotel name from database
+            hotel_name = settings.HOTEL_NAME  # Default fallback
+            try:
+                # Get the digital key by UUID
+                digital_key = db.query(DigitalKey).filter(DigitalKey.key_uuid == pass_data["key_uuid"]).first()
+                if digital_key:
+                    # Get the reservation
+                    reservation = db.query(Reservation).filter(Reservation.id == digital_key.reservation_id).first()
+                    if reservation:
+                        # Get the room
+                        room = db.query(Room).filter(Room.id == reservation.room_id).first()
+                        if room and room.hotel:
+                            hotel_name = room.hotel.name
+                            logger.info(f"Found hotel name from database: {hotel_name}")
+            except Exception as hotel_err:
+                logger.warning(f"Error getting hotel name from database: {str(hotel_err)}")
             
             # Create a temporary directory to build the pass
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -90,33 +109,31 @@ def create_apple_wallet_pass(pass_data, db=None):
                 # Similarly for check_out
                 check_out_dt = datetime.fromisoformat(pass_data['check_out']).replace(microsecond=0)
                 formatted_check_out = check_out_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
-                # Format dates with proper timezone
-                # formatted_check_in = format_datetime_with_timezone(pass_data['check_in'])
-                # formatted_check_out = format_datetime_with_timezone(pass_data['check_out'])
+                
                 pkpass_filename = f"hotelkey_{pass_data['key_uuid']}.pkpass"
+                
                 # Create pass.json structure
                 pass_json = {
                     "formatVersion": 1,
                     "passTypeIdentifier": settings.APPLE_PASS_TYPE_ID,
                     "teamIdentifier": settings.APPLE_TEAM_ID,
                     "serialNumber": pass_data["key_uuid"],
-                    "organizationName": settings.HOTEL_NAME,
-                    "description": f"Room Key for {settings.HOTEL_NAME}",
+                    "organizationName": hotel_name,  # Use the hotel name from DB
+                    "description": f"Room Key for {hotel_name}",  # Use the hotel name from DB
                     
                     # Fixed color formatting
                     "foregroundColor": "rgb(255, 255, 255)",
                     "backgroundColor": "rgb(44, 62, 80)",
                     
                     "labelColor": "rgb(255, 255, 255)",
-                    "logoText": settings.HOTEL_NAME,
-                    # TODO add ads in wallet for customers
-                    # TODO: send link contains two ad to wallet android and apple
+                    "logoText": hotel_name,  # Use the hotel name from DB
+                    
                     # Locations configuration
                     "locations": [
                         {
                             "longitude": 43.5483,
                             "latitude": 7.1216,
-                            "relevantText": "Welcome to Palacio Holding Hotel! Your digital key is ready to use."
+                            "relevantText": f"Welcome to {hotel_name}! Your digital key is ready to use."  # Use the hotel name from DB
                         }
                     ],
                     
@@ -144,7 +161,7 @@ def create_apple_wallet_pass(pass_data, db=None):
                                 "label": "HOTEL",
                                 "value": pass_data.get(
                                     'hotel_display_name', 
-                                    settings.HOTEL_NAME
+                                    hotel_name  # Use the hotel name from DB
                                 )
                             }
                         ],
@@ -153,15 +170,11 @@ def create_apple_wallet_pass(pass_data, db=None):
                                 "key": "checkIn",
                                 "label": "CHECK-IN",
                                 "value": formatted_check_in,
-                                # "dateStyle": "PKDateStyleMedium",
-                                # "timeStyle": "PKTimeStyleShort"
                             },
                             {
                                 "key": "checkOut",
                                 "label": "CHECK-OUT",
                                 "value": formatted_check_out,
-                                # "dateStyle": "PKDateStyleMedium",
-                                # "timeStyle": "PKTimeStyleShort"
                             }
                         ],
                         # Optional back fields for additional information
@@ -188,7 +201,6 @@ def create_apple_wallet_pass(pass_data, db=None):
                             }
                         ])
                     },
-                    
                     # Barcode configuration
                     "barcodes": [
                         {

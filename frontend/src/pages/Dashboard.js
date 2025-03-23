@@ -299,16 +299,29 @@ function Dashboard() {
     persistUserData(updatedUser); // Save to localStorage
   };
 
-  const handleCreateKey = async (reservationId, passType, sendEmail) => {
+  const handleCreateKey = async (
+    reservationId, 
+    passType, 
+    sendEmail, 
+    alternativeEmail = null, 
+  ) => {
     const token = localStorage.getItem('token');
     
     try {
-      const response = await axios.post(`${API_URL}/keys`, 
-        {
-          reservation_id: reservationId,
-          pass_type: passType,
-          send_email: sendEmail
-        },
+      const payload = {
+        reservation_id: reservationId,
+        pass_type: passType,
+        send_email: sendEmail
+      };
+
+      // Add optional parameters if they exist
+      if (alternativeEmail) {
+        payload.alternative_email = alternativeEmail;
+      }
+      
+      const response = await axios.post(
+        `${API_URL}/keys`, 
+        payload,
         {
           headers: { 'Authorization': `Bearer ${token}` }
         }
@@ -411,13 +424,19 @@ function Dashboard() {
     }
   };
 
-  const handleSendKeyEmail = async (keyId) => {
+  const handleSendKeyEmail = async (keyId, alternativeEmail = null) => {
     const token = localStorage.getItem('token');
     
     try {
-      // Check if endpoint exists by checking if we get a 404
+      // Prepare payload
+      const payload = {};
+      if (alternativeEmail) {
+        payload.alternative_email = alternativeEmail;
+      }
+
+      // Send request
       try {
-        await axios.post(`${API_URL}/keys/${keyId}/send-email`, {}, {
+        await axios.post(`${API_URL}/keys/${keyId}/send-email`, payload, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -448,6 +467,36 @@ function Dashboard() {
     } catch (err) {
       console.error('Error in handleSendKeyEmail:', err);
       toast.error('Failed to process key email request');
+    }
+  };
+
+  const handleSendKeySMS = async (keyId, phoneNumbers) => {
+    const token = localStorage.getItem('token');
+    
+    if (!phoneNumbers || phoneNumbers.length === 0) {
+      toast.error('No phone numbers provided');
+      return;
+    }
+    
+    try {
+      console.log('Sending SMS to numbers:', phoneNumbers);
+      
+      await axios.post(  // Remove the 'response =' part
+        `${API_URL}/keys/${keyId}/send-sms`, 
+        phoneNumbers,
+        {
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      toast.success('Key SMS sent successfully');
+    } catch (err) {
+      console.error('Error sending key SMS:', err);
+      toast.error('Failed to send key SMS: ' + (err.response?.data?.detail || err.message));
+      throw err;
     }
   };
 
@@ -582,6 +631,7 @@ function Dashboard() {
                 onDeactivate={handleDeactivateKey}
                 onExtend={handleExtendKey}
                 onSendEmail={handleSendKeyEmail}
+                onSendSMS={handleSendKeySMS}
                 isStaff={['admin', 'hotel_staff'].includes(user?.role)}
                 onRefresh={user?.role === 'guest' ? fetchUserKeys : fetchAllKeys}
               />

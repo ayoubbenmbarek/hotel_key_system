@@ -15,6 +15,10 @@ class DigitalKeyBase(BaseModel):
 # Properties to receive on key creation
 class DigitalKeyCreate(DigitalKeyBase):
     send_email: bool = True
+    # TODO: add for sms send
+    alternative_email: Optional[str] = None
+    send_sms: bool = False
+    phone_numbers: Optional[List[str]] = None
 
 
 # Properties to receive on key update
@@ -81,7 +85,7 @@ class KeyVerification(BaseModel):
     guest_name: Optional[str] = None
 
 
-# Key event schemas
+# Key event schemas TODO: move to key_event.py
 class KeyEventBase(BaseModel):
     key_id: str
     event_type: str

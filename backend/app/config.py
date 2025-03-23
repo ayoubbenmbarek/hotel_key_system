@@ -7,6 +7,10 @@ from typing import Optional, Dict, Any, Union, List
 # In Pydantic v2, BaseSettings has been moved to pydantic-settings
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import PostgresDsn, EmailStr, field_validator, model_validator
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 
 # Function to clean environment variable values by removing comments
@@ -30,6 +34,15 @@ class Settings(BaseSettings):
     APPLE_PUSH_KEY_ID: str = get_env("APPLE_PUSH_KEY_ID", "BA9F84UHXN")
     PRODUCTION: str = get_env("PRODUCTION", "True")
     ENVIRONMENT: str = get_env("ENVIRONMENT", "development")
+
+    # For Twilio
+    TWILIO_ACCOUNT_SID: str = get_env("TWILIO_ACCOUNT_SID")
+    TWILIO_AUTH_TOKEN: str = get_env("TWILIO_AUTH_TOKEN")
+    TWILIO_PHONE_NUMBER: str = get_env("TWILIO_PHONE_NUMBER")
+
+    # For generic SMS API
+    SMS_API_URL: str = get_env("SMS_API_URL", "https://your-sms-provider.com/api/send")
+    SMS_API_KEY: str = get_env("SMS_API_KEY", "your_api_key")
 
     # Set a default value directly as an integer
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 11520  # 8 days
@@ -87,7 +100,7 @@ class Settings(BaseSettings):
     GOOGLE_SERVICE_ACCOUNT_PATH: str = get_env("GOOGLE_SERVICE_ACCOUNT_PATH", "./certificates/google/service_account.json")
     
     # Application info
-    HOTEL_NAME: str = get_env("HOTEL_NAME", "Palacio Holding Mbarek")
+    HOTEL_NAME: str = get_env("HOTEL_NAME", "Hotel")
     HOTEL_LOGO_URL: str = get_env("HOTEL_LOGO_URL", "./backend/static/images/hotel_logo.png")
     HOTEL_ICON_URL: str = get_env("HOTEL_ICON_URL", "./backend/static/images/hotel_icon.png")
     

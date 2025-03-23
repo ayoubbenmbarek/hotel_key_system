@@ -11,6 +11,8 @@ services:
     volumes:
       - ./backend:/app
       - ./certificates:/app/certificates
+    env_file:
+      - ./.env
     environment:
       - POSTGRES_SERVER=db
       - POSTGRES_USER=postgres

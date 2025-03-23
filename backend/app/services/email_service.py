@@ -16,6 +16,12 @@ from io import BytesIO
 import base64
 
 from app.config import settings
+from app.utils.date_formatting import format_datetime
+from app.db.session import get_db_context
+from app.services.hotel_service import get_hotel_name
+from app.models.digital_key import DigitalKey
+from app.models.reservation import Reservation
+from app.models.room import Room
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -23,12 +29,6 @@ logger = logging.getLogger(__name__)
 # Set up Jinja2 environment for email templates
 templates_dir = Path(__file__).parent.parent.parent / "templates"
 env = Environment(loader=FileSystemLoader(templates_dir))
-
-
-def format_datetime(dt_str):
-    """Format ISO datetime string to human-readable format"""
-    dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
-    return dt.strftime("%A, %B %d, %Y at %I:%M %p")
 
 
 def generate_qr_code(url):
@@ -78,9 +78,15 @@ def send_key_email(recipient_email, guest_name, pass_url, key_id, pass_data, max
         logger.error(f"Invalid email address: {recipient_email}. {validation_message}")
         return False, validation_message
     try:
+        # Get hotel name from database
+        with get_db_context() as db:
+            # Get hotel_id from room if available in pass_data
+            hotel_id = pass_data.get("hotel_id", None)
+            hotel_name = get_hotel_name(db, hotel_id)
+        
         # Create message
         msg = MIMEMultipart('related')
-        msg['Subject'] = f"Your Digital Room Key - {settings.HOTEL_NAME}"
+        msg['Subject'] = f"Your Digital Room Key - {hotel_name}"
         msg['From'] = f"{settings.EMAILS_FROM_NAME} <{settings.EMAILS_FROM_EMAIL}>"
         msg['To'] = recipient_email
         
@@ -92,7 +98,7 @@ def send_key_email(recipient_email, guest_name, pass_url, key_id, pass_data, max
         
         # Render HTML content with template
         html_content = template.render(
-            hotel_name=settings.HOTEL_NAME,
+            hotel_name=hotel_name,
             hotel_logo_url=settings.HOTEL_LOGO_URL,
             hotel_website=settings.FRONTEND_URL,
             guest_name=guest_name,
@@ -109,7 +115,7 @@ def send_key_email(recipient_email, guest_name, pass_url, key_id, pass_data, max
         
         # Create plain text version
         text_content = f"""
-            Welcome to {settings.HOTEL_NAME}!
+            Welcome to {hotel_name}!
 
             Hello {guest_name},
 
@@ -124,7 +130,7 @@ def send_key_email(recipient_email, guest_name, pass_url, key_id, pass_data, max
             We hope you enjoy your stay!
 
             Best regards,
-            The {settings.HOTEL_NAME} Team
+            The {hotel_name} Team
                     """
         
         # Attach text and HTML versions
@@ -170,9 +176,36 @@ def send_key_email(recipient_email, guest_name, pass_url, key_id, pass_data, max
 def send_key_download_link(recipient_email, guest_name, key_id):
     """Send email with a download link for the digital key"""
     try:
+        # Get hotel name from database using key_id
+        with get_db_context() as db:
+            # Get the digital key
+            key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
+            if not key:
+                logger.error(f"Key not found: {key_id}")
+                return False
+                
+            # Get the reservation
+            reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
+            if not reservation:
+                logger.error(f"Reservation not found for key: {key_id}")
+                return False
+                
+            # Get the room
+            room = db.query(Room).filter(Room.id == reservation.room_id).first()
+            if not room:
+                logger.error(f"Room not found for reservation: {reservation.id}")
+                return False
+                
+            # Now that we have the hotel_id, use your existing function
+            hotel_id = room.hotel_id
+            hotel_name = get_hotel_name(db, hotel_id)
+            
+            # Fallback if no hotel name is found
+            if not hotel_name:
+                hotel_name = settings.HOTEL_NAME
         # Create message
         msg = MIMEMultipart()
-        msg['Subject'] = f"Your Digital Room Key Download Link - {settings.HOTEL_NAME}"
+        msg['Subject'] = f"Your Digital Room Key Download Link - {hotel_name}"
         msg['From'] = f"{settings.EMAILS_FROM_NAME} <{settings.EMAILS_FROM_EMAIL}>"
         msg['To'] = recipient_email
         
@@ -184,7 +217,7 @@ def send_key_download_link(recipient_email, guest_name, key_id):
         
         # Render HTML content with template
         html_content = template.render(
-            hotel_name=settings.HOTEL_NAME,
+            hotel_name=hotel_name,
             hotel_logo_url=settings.HOTEL_LOGO_URL,
             hotel_website=settings.FRONTEND_URL,
             guest_name=guest_name,
@@ -200,7 +233,7 @@ def send_key_download_link(recipient_email, guest_name, key_id):
             {download_url}
 
             Best regards,
-            The {settings.HOTEL_NAME} Team
+            The {hotel_name} Team
                     """
         
         # Attach text and HTML versions

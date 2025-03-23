@@ -8,6 +8,8 @@ function ReservationList({ reservations, loading, onCreateKey, isStaff, onRefres
   const [creatingKey, setCreatingKey] = useState(false);
   const [passType, setPassType] = useState('apple');
   const [sendEmail, setSendEmail] = useState(true);
+  const [alternativeEmail, setAlternativeEmail] = useState('');
+
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -18,8 +20,18 @@ function ReservationList({ reservations, loading, onCreateKey, isStaff, onRefres
   const handleCreateKey = async (reservationId) => {
     setCreatingKey(true);
     try {
-      await onCreateKey(reservationId, passType, sendEmail);
+      await onCreateKey(
+        reservationId, 
+        passType, 
+        sendEmail, 
+        alternativeEmail || null, 
+      );
       setSelectedReservation(null);
+      
+      // Reset form fields
+      setPassType('apple');
+      setSendEmail(true);
+      setAlternativeEmail('');
     } catch (err) {
       console.error('Error in ReservationList creating key:', err);
     } finally {
@@ -183,13 +195,13 @@ function ReservationList({ reservations, loading, onCreateKey, isStaff, onRefres
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                     </svg>
                   </div>
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                     <h3 className="text-lg leading-6 font-medium text-gray-900">
                       Create Digital Key
                     </h3>
                     <div className="mt-2">
                       <p className="text-sm text-gray-500">
-                        Choose the digital key type and options below.
+                        Choose the digital key type and delivery options below.
                       </p>
                     </div>
                     <div className="mt-4 space-y-4">
@@ -206,26 +218,55 @@ function ReservationList({ reservations, loading, onCreateKey, isStaff, onRefres
                           <option value="google">Google Wallet</option>
                         </select>
                       </div>
-                      <div className="flex items-start">
-                        <div className="flex items-center h-5">
-                          <input
-                            id="send-email"
-                            name="send-email"
-                            type="checkbox"
-                            className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
-                            checked={sendEmail}
-                            onChange={(e) => setSendEmail(e.target.checked)}
-                          />
+                      
+                      {/* Email Options */}
+                      <div className="border-t pt-4">
+                        <div className="flex items-start">
+                          <div className="flex items-center h-5">
+                            <input
+                              id="send-email"
+                              name="send-email"
+                              type="checkbox"
+                              className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                              checked={sendEmail}
+                              onChange={(e) => {
+                                setSendEmail(e.target.checked);
+                                if (!e.target.checked) {
+                                  setAlternativeEmail('');
+                                }
+                              }}
+                            />
+                          </div>
+                          <div className="ml-3 text-sm">
+                            <label htmlFor="send-email" className="font-medium text-gray-700">
+                              Send email with pass
+                            </label>
+                            <p className="text-gray-500">
+                              The digital key will be sent to the guest's email address.
+                            </p>
+                          </div>
                         </div>
-                        <div className="ml-3 text-sm">
-                          <label htmlFor="send-email" className="font-medium text-gray-700">
-                            Send email with pass
-                          </label>
-                          <p className="text-gray-500">
-                            The digital key will be sent to the guest's email address.
-                          </p>
-                        </div>
-                      </div>
+                        
+                        {/* Add alternative email field */}
+                        {sendEmail && (
+                          <div className="mt-3">
+                            <label htmlFor="alternative-email" className="block text-sm font-medium text-gray-700">
+                              Alternative Email (optional)
+                            </label>
+                            <div className="mt-1">
+                              <input
+                                type="email"
+                                name="alternative-email"
+                                id="alternative-email"
+                                className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                placeholder="Use if guest email is invalid"
+                                value={alternativeEmail}
+                                onChange={(e) => setAlternativeEmail(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>                      
                     </div>
                   </div>
                 </div>
@@ -237,7 +278,6 @@ function ReservationList({ reservations, loading, onCreateKey, isStaff, onRefres
                     creatingKey ? 'opacity-75 cursor-not-allowed' : ''
                   }`}
                   onClick={() => handleCreateKey(selectedReservation)}
-                  disabled={creatingKey}
                 >
                   {creatingKey ? 'Creating...' : 'Create Key'}
                 </button>
