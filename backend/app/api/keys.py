@@ -1,9 +1,10 @@
 # backend/app/api/keys.py
 from typing import Any, List, Tuple, Optional
-from fastapi import Query
+from fastapi import Query, Body
 import uuid
 import logging
 from datetime import datetime, timezone
+from pydantic import BaseModel
 
 from app.services.wallet_service import create_wallet_pass, settings
 from app.services.key_service import update_checkout_date
@@ -36,6 +37,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# TODO remove class form here
+class SendEmailRequest(BaseModel):
+    alternative_email: Optional[str] = None
+# Add this to your backend/app/api/keys.py file
 
 @router.post("", response_model=DigitalKeySchema, status_code=status.HTTP_201_CREATED)
 def create_digital_key(
@@ -570,16 +575,14 @@ def deactivate_key(
 
     return key
 
-
-# Add this to your backend/app/api/keys.py file
-
 @router.post("/{key_id}/send-email", status_code=status.HTTP_200_OK)
 def send_key_email_endpoint(
     *,
     db: Session = Depends(get_db),
     key_id: str,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    request: SendEmailRequest = Body(default=None)
 ) -> dict:
     """
     Send email with digital key pass to the user
@@ -634,34 +637,48 @@ def send_key_email_endpoint(
         "nfc_lock_id": room.nfc_lock_id
     }
     
-    # Check email validity before sending
-    is_valid, validation_message = validate_email(user.email)
-    if not is_valid:
-        # Create more detailed error message
-        error_detail = f"Cannot send email to {user.email}: {validation_message}. Please verify the email address is correct and active, or update the user's email to a valid address."
-        logger.error(f"Email validation failed: {error_detail}")
-        
-        # Log the email validation failure
-        event = KeyEvent(
-            key_id=key.id,
-            event_type="key_email_failed",
-            device_info=f"API request by {current_user.email}",
-            status="error",
-            details=f"Invalid email: {user.email}. {validation_message}"
-        )
-        db.add(event)
-        db.commit()
-        
-        # Return error to the frontend
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_detail
-        )
+    # Determine which email to use
+    email_to_use = user.email
+    
+    # If alternative email is provided and the user has permissions, use it
+    if request and request.alternative_email and current_user.role in ["admin", "hotel_staff"]:
+        # Validate the alternative email
+        is_valid, validation_message = validate_email(request.alternative_email)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid alternative email: {validation_message}"
+            )
+        email_to_use = request.alternative_email
+    else:
+        # Check if the default email is valid
+        is_valid, validation_message = validate_email(email_to_use)
+        if not is_valid:
+            # Create more detailed error message
+            error_detail = f"Cannot send email to {email_to_use}: {validation_message}. Please verify the email address is correct and active, or provide an alternative email."
+            logger.error(f"Email validation failed: {error_detail}")
+            
+            # Log the email validation failure
+            event = KeyEvent(
+                key_id=key.id,
+                event_type="key_email_failed",
+                device_info=f"API request by {current_user.email}",
+                status="error",
+                details=f"Invalid email: {email_to_use}. {validation_message}"
+            )
+            db.add(event)
+            db.commit()
+            
+            # Return error to the frontend
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_detail
+            )
     
     # Send email in background
     background_tasks.add_task(
         send_key_email,
-        user.email,
+        email_to_use,
         f"{user.first_name} {user.last_name}",
         key.pass_url,
         key.id,
@@ -674,12 +691,12 @@ def send_key_email_endpoint(
         event_type="key_email_sent",
         device_info=f"API request by {current_user.email}",
         status="success",
-        details=f"Email sent to {user.email} for {key.pass_type.value} pass"
+        details=f"Email sent to {email_to_use} for {key.pass_type.value} pass"
     )
     db.add(event)
     db.commit()
     
-    return {"message": f"Email with digital key successfully sent to {user.email}"}
+    return {"message": f"Email with digital key successfully sent to {email_to_use}"}
 
 
 @router.post("/{key_id}/send-sms", status_code=status.HTTP_200_OK, response_model=SMSResponseModel)

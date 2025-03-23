@@ -80,9 +80,31 @@ def send_key_email(recipient_email, guest_name, pass_url, key_id, pass_data, max
     try:
         # Get hotel name from database
         with get_db_context() as db:
-            # Get hotel_id from room if available in pass_data
-            hotel_id = pass_data.get("hotel_id", None)
+            # Get the digital key
+            key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
+            if not key:
+                logger.error(f"Key not found: {key_id}")
+                return False
+                
+            # Get the reservation
+            reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
+            if not reservation:
+                logger.error(f"Reservation not found for key: {key_id}")
+                return False
+                
+            # Get the room
+            room = db.query(Room).filter(Room.id == reservation.room_id).first()
+            if not room:
+                logger.error(f"Room not found for reservation: {reservation.id}")
+                return False
+                
+            # Now that we have the hotel_id, use your existing function
+            hotel_id = room.hotel_id
             hotel_name = get_hotel_name(db, hotel_id)
+            
+            # Fallback if no hotel name is found
+            if not hotel_name:
+                hotel_name = settings.HOTEL_NAME
         
         # Create message
         msg = MIMEMultipart('related')

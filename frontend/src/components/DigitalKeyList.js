@@ -20,9 +20,14 @@ function DigitalKeyList({
   const [extendTime, setExtendTime] = useState('12:00');
   const [processingKey, setProcessingKey] = useState(false);
   const [showSMSModal, setShowSMSModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const [selectedKeyForSMS, setSelectedKeyForSMS] = useState(null);
+  const [selectedKeyForEmail, setSelectedKeyForEmail] = useState(null);
+  const [emailInfo, setEmailInfo] = useState(null);
+  const [customEmail, setCustomEmail] = useState('');
   const [phoneNumbers, setPhoneNumbers] = useState(['']);
   const [sendingSMS, setSendingSMS] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -69,15 +74,52 @@ function DigitalKeyList({
     }
   };
 
-  const handleSendEmail = async (keyId) => {
-    setProcessingKey(true);
+  const handleSendEmail = async (keyId, alternativeEmail = null) => {
+    if (alternativeEmail) {
+      setSendingEmail(true);
+    } else {
+      setProcessingKey(true);
+    }
+    
     try {
-      await onSendEmail(keyId);
+      await onSendEmail(keyId, alternativeEmail);
+      if (alternativeEmail) {
+        setShowEmailModal(false);
+        setCustomEmail('');
+        setSelectedKeyForEmail(null);
+      } else {
+        setShowEmailModal(false);
+      }
     } catch (err) {
       console.error('Error sending key email:', err);
     } finally {
+      setSendingEmail(false);
       setProcessingKey(false);
     }
+  };
+  
+  const handleOpenEmailModal = async (key) => {
+    // Find the current key in the array
+    const currentKey = keys.find(k => k.id === key.id);
+    
+    if (currentKey && currentKey.reservation && currentKey.reservation.user) {
+      // If we have the guest info from the key's reservation
+      const userInfo = currentKey.reservation.user;
+      setEmailInfo({
+        name: `${userInfo.first_name} ${userInfo.last_name}`,
+        email: userInfo.email
+      });
+    } else {
+      // Otherwise show that we don't have the email info but will use the database email
+      setEmailInfo({
+        name: "Current guest",
+        email: "The email address stored in the database will be used"
+      });
+    }
+    
+    setSelectedKeyForEmail(key.id);
+    setCustomEmail(''); // Reset custom email field
+    setShowEmailModal(true);
   };
 
   const handleSendSMS = async () => {
@@ -271,11 +313,14 @@ function DigitalKeyList({
                       Extend
                     </button>
                     
-                    <button
-                      onClick={() => handleSendEmail(key.id)}
-                      disabled={processingKey}
+                    <button 
+                      onClick={() => handleOpenEmailModal(key)}
+                      disabled={processingKey || sendingEmail}
                       className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                     >
+                      <svg className="mr-1 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
                       Send Email
                     </button>
                     <button
@@ -394,6 +439,8 @@ function DigitalKeyList({
         isOpen={viewingKeyId !== null}
         onClose={() => setViewingKeyId(null)} 
       />
+      
+      {/* SMS Modal */}
       {showSMSModal && (
         <div className="fixed z-10 inset-0 overflow-y-auto">
           <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -485,6 +532,97 @@ function DigitalKeyList({
                     setSelectedKeyForSMS(null);
                   }}
                   disabled={sendingSMS}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Email Modal */}
+      {showEmailModal && (
+        <div className="fixed z-10 inset-0 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <svg className="h-6 w-6 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      Send Digital Key via Email
+                    </h3>
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500">
+                        Send the digital key to the default email or enter a custom email address
+                      </p>
+                    </div>
+                    <div className="mt-4">
+                      {emailInfo && (
+                        <div className="mb-4 bg-gray-50 p-4 rounded-md">
+                          <p className="text-sm font-medium text-gray-700">Guest: {emailInfo.name}</p>
+                          <p className="text-sm text-gray-600">Default Email: {emailInfo.email}</p>
+                          
+                          <div className="mt-3">
+                            <button
+                              type="button"
+                              className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                              onClick={() => handleSendEmail(selectedKeyForEmail)}
+                              disabled={processingKey || sendingEmail}
+                            >
+                              {processingKey || sendingEmail ? 'Sending...' : 'Use Default Email'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      <div className="space-y-3">
+                        <div>
+                          <label htmlFor="custom-email" className="block text-sm font-medium text-gray-700">
+                            Use Different Email Address:
+                          </label>
+                          <input
+                            type="email"
+                            id="custom-email"
+                            className="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                            placeholder="Enter custom email address"
+                            value={customEmail}
+                            onChange={(e) => setCustomEmail(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm ${
+                    sendingEmail ? 'opacity-75 cursor-not-allowed' : ''
+                  }`}
+                  onClick={() => handleSendEmail(selectedKeyForEmail, customEmail)}
+                  disabled={sendingEmail || !customEmail}
+                >
+                  {sendingEmail ? 'Sending...' : 'Send to Custom Email'}
+                </button>
+                <button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => {
+                    setShowEmailModal(false);
+                    setSelectedKeyForEmail(null);
+                    setCustomEmail('');
+                  }}
+                  disabled={sendingEmail || processingKey}
                 >
                   Cancel
                 </button>

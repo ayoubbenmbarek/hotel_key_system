@@ -434,13 +434,18 @@ function Dashboard() {
         payload.alternative_email = alternativeEmail;
       }
 
+      console.log(`Sending key email for key ${keyId}${alternativeEmail ? ' to ' + alternativeEmail : ''}`);
+
       // Send request
       try {
         await axios.post(`${API_URL}/keys/${keyId}/send-email`, payload, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         });
         
-        toast.success('Key email sent successfully');
+        toast.success(`Key email sent successfully${alternativeEmail ? ' to ' + alternativeEmail : ''}`);
       } catch (err) {
         // If 404, use alternative approach
         if (err.response?.status === 404) {
