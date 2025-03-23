@@ -10,7 +10,7 @@ from app.services.wallet_service import create_wallet_pass, settings
 from app.services.key_service import update_checkout_date
 from app.services.wallet_push_service import send_push_notifications, send_push_notifications_production
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
 from app.security import get_current_user, get_current_active_staff
@@ -278,7 +278,9 @@ def read_keys(
     """
     Retrieve digital keys, filtered by reservation if provided
     """
-    query = db.query(DigitalKey)
+    query = db.query(DigitalKey).options(
+        joinedload(DigitalKey.reservation).joinedload(Reservation.user)
+    )
     
     if reservation_id:
         query = query.filter(DigitalKey.reservation_id == reservation_id)

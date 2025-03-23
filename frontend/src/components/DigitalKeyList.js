@@ -262,6 +262,11 @@ function DigitalKeyList({
                     <div className="text-sm text-gray-500">
                       ID: {key.key_uuid?.substring(0, 8)}...
                     </div>
+                    {key.reservation?.user && (
+                      <div className="text-sm text-indigo-600">
+                        Guest: {key.reservation.user.first_name} {key.reservation.user.last_name}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="ml-2 flex-shrink-0 flex">

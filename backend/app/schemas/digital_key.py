@@ -2,23 +2,34 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional, List
 from datetime import datetime, timezone
+from enum import Enum
 
 from app.models.digital_key import KeyStatus, KeyType
+from app.schemas.reservation import Reservation
 
 
 # Shared properties
 class DigitalKeyBase(BaseModel):
     reservation_id: str
     pass_type: KeyType
+    key_uuid: str
+    pass_url: Optional[str] = None
+    valid_from: datetime
+    valid_until: datetime
+    is_active: bool = True
+    status: KeyStatus = KeyStatus.CREATED
+    activated_at: Optional[datetime] = None
+    last_used: Optional[datetime] = None
+    access_count: int = 0
 
 
 # Properties to receive on key creation
-class DigitalKeyCreate(DigitalKeyBase):
-    send_email: bool = True
-    # TODO: add for sms send
-    alternative_email: Optional[str] = None
+class DigitalKeyCreate(BaseModel):
+    reservation_id: str
+    pass_type: KeyType = KeyType.APPLE
+    send_email: bool = False
     send_sms: bool = False
-    phone_numbers: Optional[List[str]] = None
+    phone_numbers: Optional[list[str]] = None
 
 
 # Properties to receive on key update
@@ -45,29 +56,30 @@ class KeyExtension(BaseModel):
         return v
 
 
-# Properties shared by models returned from API
-class DigitalKeyInDBBase(DigitalKeyBase):
-    id: str
-    key_uuid: str
-    pass_url: Optional[str]
-    valid_from: datetime
-    valid_until: datetime
-    is_active: bool
-    status: KeyStatus
-    activated_at: Optional[datetime]
-    last_used: Optional[datetime]
-    access_count: int
-    created_at: datetime
-    updated_at: datetime
-    
+# Properties for key events
+class KeyEvent(BaseModel):
+    key_id: str
+    event_type: str
+    device_info: Optional[str] = None
+    status: str
+    details: Optional[str] = None
+    timestamp: datetime
+
     model_config = {
         "from_attributes": True
     }
 
 
-# Additional properties to return via API
-class DigitalKey(DigitalKeyInDBBase):
-    pass
+# Properties shared by models returned from API
+class DigitalKey(DigitalKeyBase):
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    reservation: Optional[Reservation] = None
+
+    model_config = {
+        "from_attributes": True
+    }
 
 
 # Key verification schemas
@@ -97,12 +109,3 @@ class KeyEventBase(BaseModel):
 
 class KeyEventCreate(KeyEventBase):
     pass
-
-
-class KeyEvent(KeyEventBase):
-    id: str
-    timestamp: datetime
-    
-    model_config = {
-        "from_attributes": True
-    }

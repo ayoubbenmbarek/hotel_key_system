@@ -123,11 +123,12 @@ def read_reservations(
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """
-    Retrieve reservations with room and hotel information
+    Retrieve reservations with room, hotel, and user information
     """
-    # Use joinedload to eagerly load the room and hotel relationships
+    # Use joinedload to eagerly load the room, hotel, and user relationships
     query = db.query(Reservation).options(
-        joinedload(Reservation.room).joinedload(Room.hotel)
+        joinedload(Reservation.room).joinedload(Room.hotel),
+        joinedload(Reservation.user)
     )
     
     # Rest of the function remains the same

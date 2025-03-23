@@ -4,6 +4,7 @@ from typing import Optional, List
 from datetime import datetime
 
 from app.schemas.room import Room
+from app.schemas.user import User
 from app.models.reservation import ReservationStatus
 
 
@@ -58,6 +59,7 @@ class Reservation(ReservationBase):
     created_at: datetime
     updated_at: datetime
     room: Optional[Room] = None
+    user: Optional[User] = None
     
     model_config = {
         "from_attributes": True
