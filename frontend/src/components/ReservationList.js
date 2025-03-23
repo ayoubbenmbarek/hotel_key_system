@@ -1,6 +1,7 @@
 // frontend/src/components/ReservationList.js
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import ReservationDetails from './ReservationDetails';
+import SearchBar from './SearchBar';
 
 function ReservationList({ reservations, loading, onCreateKey, isStaff, onRefresh, onAddReservation }) {
   const [selectedReservation, setSelectedReservation] = useState(null);
@@ -9,7 +10,29 @@ function ReservationList({ reservations, loading, onCreateKey, isStaff, onRefres
   const [passType, setPassType] = useState('apple');
   const [sendEmail, setSendEmail] = useState(true);
   const [alternativeEmail, setAlternativeEmail] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
+  // Filter reservations based on search query
+  const filteredReservations = useMemo(() => {
+    if (!searchQuery.trim() || !reservations) return reservations;
+    
+    const query = searchQuery.toLowerCase();
+    return reservations.filter(reservation => {
+      const user = reservation.user || {};
+      const room = reservation.room || {};
+      const hotel = room.hotel || {};
+      
+      return (
+        reservation.confirmation_code?.toLowerCase().includes(query) ||
+        room.room_number?.toString().toLowerCase().includes(query) ||
+        user.first_name?.toLowerCase().includes(query) ||
+        user.last_name?.toLowerCase().includes(query) ||
+        user.email?.toLowerCase().includes(query) ||
+        hotel.name?.toLowerCase().includes(query) ||
+        reservation.status?.toLowerCase().includes(query)
+      );
+    });
+  }, [reservations, searchQuery]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -61,46 +84,57 @@ function ReservationList({ reservations, loading, onCreateKey, isStaff, onRefres
 
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
-      <div className="px-4 py-5 sm:px-6 border-b flex justify-between items-center">
-        <div>
-          <h3 className="text-lg leading-6 font-medium text-gray-900">
-            Reservations
-          </h3>
-          <p className="mt-1 max-w-2xl text-sm text-gray-500">
-            Your current and upcoming hotel reservations
-          </p>
-        </div>
-        <div className="flex space-x-2">
-          {isStaff && (
+      <div className="px-4 py-5 sm:px-6 border-b">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
+              Reservations
+            </h3>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500">
+              Your current and upcoming hotel reservations
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            {isStaff && (
+              <button
+                onClick={onAddReservation}
+                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                New Reservation
+              </button>
+            )}
             <button
-              onClick={onAddReservation}
-              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              onClick={onRefresh}
+              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              New Reservation
+              Refresh
             </button>
-          )}
-          <button
-            onClick={onRefresh}
-            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Refresh
-          </button>
+          </div>
         </div>
+        
+        <SearchBar
+          placeholder="Search by confirmation code, room number, guest name..."
+          value={searchQuery}
+          onChange={setSearchQuery}
+          className="max-w-md"
+        />
       </div>
       
-      {!reservations || reservations.length === 0 ? (
+      {!filteredReservations || filteredReservations.length === 0 ? (
         <div className="px-4 py-5 sm:p-6 text-center">
-          <p className="text-gray-500">No reservations found</p>
+          <p className="text-gray-500">
+            {searchQuery.trim() ? 'No reservations found matching your search' : 'No reservations found'}
+          </p>
         </div>
       ) : (
         <ul className="divide-y divide-gray-200">
-          {Array.isArray(reservations) && reservations.map((reservation) => (
+          {Array.isArray(filteredReservations) && filteredReservations.map((reservation) => (
             <li key={reservation.id} className="px-4 py-4 sm:px-6">
               <div className="flex items-center justify-between">
                 <div className="flex flex-col md:flex-row md:items-center">

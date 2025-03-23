@@ -1,7 +1,9 @@
 // frontend/src/components/DigitalKeyList.js
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { KeyEventsModal } from './KeyEventsList';
 import { toast } from 'react-toastify';
+import SearchBar from './SearchBar';
+
 function DigitalKeyList({
   keys,
   loading,
@@ -28,6 +30,28 @@ function DigitalKeyList({
   const [phoneNumbers, setPhoneNumbers] = useState(['']);
   const [sendingSMS, setSendingSMS] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter keys based on search query
+  const filteredKeys = useMemo(() => {
+    if (!searchQuery.trim() || !keys) return keys;
+    
+    const query = searchQuery.toLowerCase();
+    return keys.filter(key => {
+      const reservation = key.reservation || {};
+      const user = reservation.user || {};
+      const room = reservation.room || {};
+      
+      return (
+        key.key_uuid?.toLowerCase().includes(query) ||
+        key.pass_type?.toLowerCase().includes(query) ||
+        room.room_number?.toString().toLowerCase().includes(query) ||
+        user.first_name?.toLowerCase().includes(query) ||
+        user.last_name?.toLowerCase().includes(query) ||
+        user.email?.toLowerCase().includes(query)
+      );
+    });
+  }, [keys, searchQuery]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -185,33 +209,44 @@ function DigitalKeyList({
 
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
-      <div className="px-4 py-5 sm:px-6 border-b flex justify-between items-center">
-        <div>
-          <h3 className="text-lg leading-6 font-medium text-gray-900">
-            Digital Keys
-          </h3>
-          <p className="mt-1 max-w-2xl text-sm text-gray-500">
-            Your digital room keys
-          </p>
+      <div className="px-4 py-5 sm:px-6 border-b">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h3 className="text-lg leading-6 font-medium text-gray-900">
+              Digital Keys
+            </h3>
+            <p className="mt-1 max-w-2xl text-sm text-gray-500">
+              Your digital room keys
+            </p>
+          </div>
+          <button
+            onClick={onRefresh}
+            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
         </div>
-        <button
-          onClick={onRefresh}
-          className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-        >
-          <svg className="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Refresh
-        </button>
+        
+        <SearchBar
+          placeholder="Search by room number, guest name, or key ID..."
+          value={searchQuery}
+          onChange={setSearchQuery}
+          className="max-w-md"
+        />
       </div>
       
-      {!keys || keys.length === 0 ? (
+      {!filteredKeys || filteredKeys.length === 0 ? (
         <div className="px-4 py-5 sm:p-6 text-center">
-          <p className="text-gray-500">No digital keys found</p>
+          <p className="text-gray-500">
+            {searchQuery.trim() ? 'No keys found matching your search' : 'No digital keys found'}
+          </p>
         </div>
       ) : (
         <ul className="divide-y divide-gray-200">
-          {Array.isArray(keys) && keys.map((key) => (
+          {Array.isArray(filteredKeys) && filteredKeys.map((key) => (
             <li key={key.id} className="px-4 py-4 sm:px-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
