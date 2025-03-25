@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 import pytz
 
 from app.db.session import get_db
-from app.models.digital_key import DigitalKey, KeyEvent
+from app.models.digital_key import DigitalKey
+from app.models.key_event import KeyEvent, EventType
 from app.models.reservation import Reservation
 from app.models.room import Room
 from app.models.user import User
@@ -34,10 +35,10 @@ def verify_key(
     local_tz = pytz.timezone('Europe/Paris')
     now = datetime.now(local_tz)
     
-    # Create event record
+    # Create initial access attempt event
     event = KeyEvent(
         key_id=key.id if key else None,
-        event_type="access_attempt",
+        event_type=EventType.PHYSICAL_ACCESS_ATTEMPT,
         device_info=verification.device_info,
         timestamp=now,
         location=verification.location,
@@ -50,6 +51,7 @@ def verify_key(
     # Check if key exists
     if not key:
         event.status = "failure"
+        event.event_type = EventType.PHYSICAL_ACCESS_DENIED
         event.details = "Key not found"
         db.add(event)
         db.commit()
@@ -62,6 +64,7 @@ def verify_key(
     # Check if key is active
     if not key.is_active:
         event.status = "failure"
+        event.event_type = EventType.PHYSICAL_ACCESS_DENIED
         event.details = "Key is inactive"
         db.add(event)
         db.commit()
@@ -87,6 +90,7 @@ def verify_key(
 
     if now < valid_from or now > valid_until:
         event.status = "failure"
+        event.event_type = EventType.PHYSICAL_ACCESS_DENIED
         event.details = "Key outside validity period"
         db.add(event)
         db.commit()
@@ -103,6 +107,7 @@ def verify_key(
     
     if not reservation or reservation.status not in ["confirmed", "checked_in"]:
         event.status = "failure"
+        event.event_type = EventType.PHYSICAL_ACCESS_DENIED
         event.details = f"Invalid reservation status: {reservation.status if reservation else 'None'}"
         db.add(event)
         db.commit()
@@ -117,6 +122,7 @@ def verify_key(
     # Verify the lock ID matches
     if room.nfc_lock_id != verification.lock_id:
         event.status = "failure"
+        event.event_type = EventType.PHYSICAL_ACCESS_DENIED
         event.details = f"Lock ID mismatch: Expected {room.nfc_lock_id}, got {verification.lock_id}"
         db.add(event)
         db.commit()
@@ -134,9 +140,10 @@ def verify_key(
     key.access_count += 1
     db.add(key)
     
-    # Update event status
+    # Update event status for successful access
     event.status = "success"
-    event.details = f"Access granted to room {room.room_number}"
+    event.event_type = EventType.PHYSICAL_ACCESS_GRANTED
+    event.details = f"Access granted to room {room.room_number} for {user.first_name} {user.last_name}"
     db.add(event)
     
     db.commit()
@@ -145,5 +152,5 @@ def verify_key(
         "is_valid": True,
         "message": "Access granted",
         "room_number": room.room_number,
-        "guest_name": f"{user.first_name} {user.last_name}" if user else "Unknown"
+        "guest_name": f"{user.first_name} {user.last_name}" if user else None
     }

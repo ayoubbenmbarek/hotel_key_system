@@ -32,6 +32,9 @@ def login_access_token(
     
     # Validate user and password
     if not user or not verify_password(form_data.password, user.hashed_password):
+        print(f"Password verification result: {verify_password(form_data.password, user.hashed_password)}")
+        print(f"Attempted password: {form_data.password}")
+        print(f"Stored hash: {user.hashed_password}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",

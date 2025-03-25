@@ -32,7 +32,7 @@ class UserCreate(UserBase):
             # Remove any non-digit characters
             v = ''.join(filter(str.isdigit, v))
             if len(v) < 10:
-                raise ValueError('Phone number must have at least 10 digits')
+                raise ValueError('Please enter a valid phone number (minimum 10 digits, e.g., 1234567890)')
         return v
 
 

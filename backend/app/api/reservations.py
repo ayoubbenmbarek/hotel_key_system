@@ -18,6 +18,7 @@ from app.schemas.reservation import (
     ReservationCreate,
     ReservationUpdate
 )
+from app.models.user import UserRole
 
 router = APIRouter()
 
@@ -104,7 +105,7 @@ def create_reservation(
 #         query = query.filter(Reservation.status.in_(status))
     
 #     # For non-staff users, only show their own reservations
-#     if current_user.role not in ["admin", "hotel_staff"]:
+#     if current_user.role not in ["ADMIN", "HOTEL_STAFF"]:
 #         query = query.filter(Reservation.user_id == current_user.id)
     
 #     # Order by check-in date (soonest first)
@@ -135,7 +136,7 @@ def read_reservations(
     if status:
         query = query.filter(Reservation.status.in_(status))
     
-    if current_user.role not in ["admin", "hotel_staff"]:
+    if current_user.role not in [UserRole.ADMIN, UserRole.HOTEL_STAFF]:   
         query = query.filter(Reservation.user_id == current_user.id)
     
     query = query.order_by(Reservation.check_in.desc())
@@ -166,7 +167,7 @@ def read_reservations(
 #         query = query.filter(Reservation.status.in_(status))
     
 #     # For non-staff users, only show their own reservations
-#     if current_user.role not in ["admin", "hotel_staff"]:
+#     if current_user.role not in ["ADMIN", "HOTEL_STAFF"]:
 #         query = query.filter(Reservation.user_id == current_user.id)
     
 #     # Order by check-in date (soonest first)
@@ -194,7 +195,7 @@ def read_active_reservations(
     )
     
     # For non-staff users, only show their own reservations
-    if current_user.role not in ["admin", "hotel_staff"]:
+    if current_user.role not in [UserRole.ADMIN, UserRole.HOTEL_STAFF]:
         query = query.filter(Reservation.user_id == current_user.id)
     
     # Order by check-in date (soonest first)
@@ -354,7 +355,7 @@ def cancel_reservation(
         )
     
     # Check permissions for non-staff users
-    if current_user.role not in ["admin", "hotel_staff"] and reservation.user_id != current_user.id:
+    if current_user.role not in [UserRole.ADMIN, UserRole.HOTEL_STAFF] and reservation.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"

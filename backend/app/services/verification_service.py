@@ -5,7 +5,8 @@ from typing import Dict, Any, Tuple, Optional
 
 from sqlalchemy.orm import Session
 
-from app.models.digital_key import DigitalKey, KeyEvent
+from app.models.digital_key import DigitalKey
+from app.models.key_event import KeyEvent
 from app.models.reservation import Reservation
 from app.models.room import Room
 from app.models.user import User

@@ -233,8 +233,8 @@ function AddRoomForm({ onSuccess, onCancel }) {
               <option value="standard">Standard</option>
               <option value="suite">Suite</option>
               <option value="deluxe">Deluxe</option>
-              <option value="family">Family</option>
-              <option value="accessible">Accessible</option>
+              <option value="executive">Executive</option>
+              <option value="presidential">Presidential</option>
             </select>
           </div>
           

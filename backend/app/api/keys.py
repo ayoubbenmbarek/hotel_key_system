@@ -7,15 +7,16 @@ from datetime import datetime, timezone
 from pydantic import BaseModel
 
 from app.services.wallet_service import create_wallet_pass, settings
-from app.services.key_service import update_checkout_date
+from app.services.key_service import update_checkout_date, activate_key, deactivate_key
 from app.services.wallet_push_service import send_push_notifications, send_push_notifications_production
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
 from app.security import get_current_user, get_current_active_staff
-from app.models.user import User
-from app.models.digital_key import DigitalKey, KeyStatus, KeyEvent
+from app.models.user import User, UserRole
+from app.models.digital_key import DigitalKey, KeyStatus
+from app.models.key_event import KeyEvent
 from app.models.reservation import Reservation, ReservationStatus
 from app.models.room import Room
 from app.schemas.digital_key import (
@@ -141,7 +142,8 @@ def create_digital_key(
             event_type="key_created",
             device_info=f"API request by {current_user.email}",
             status="success",
-            details=f"Created {key_in.pass_type.value} pass for room {room.room_number}, valid {digital_key.valid_from} to {digital_key.valid_until}"
+            details=f"Created {key_in.pass_type.value} pass for room {room.room_number}, valid {digital_key.valid_from} to {digital_key.valid_until}",
+            timestamp=datetime.now(timezone.utc)
         )
         db.add(key_event)
         db.commit()
@@ -153,7 +155,8 @@ def create_digital_key(
             event_type="key_creation_failed",
             device_info=f"API request by {current_user.email}",
             status="error",
-            details=f"Error creating pass: {str(e)}"
+            details=f"Error creating pass: {str(e)}",
+            timestamp=datetime.now(timezone.utc)
         )
         db.add(key_event)
         db.commit()
@@ -186,7 +189,8 @@ def create_digital_key(
                 event_type="key_email_scheduled",
                 device_info=f"API request by {current_user.email}",
                 status="success",
-                details=f"Email scheduled to be sent to {user.email}"
+                details=f"Email scheduled to be sent to {user.email}",
+                timestamp=datetime.now(timezone.utc)
             )
             db.add(key_event)
             db.commit()
@@ -199,7 +203,8 @@ def create_digital_key(
                 event_type="key_email_scheduling_failed",
                 device_info=f"API request by {current_user.email}",
                 status="error",
-                details=f"Failed to schedule email: {str(e)}"
+                details=f"Failed to schedule email: {str(e)}",
+                timestamp=datetime.now(timezone.utc)
             )
             db.add(key_event)
             db.commit()
@@ -227,23 +232,50 @@ def create_digital_key(
             failed_numbers = []
             
             for phone in valid_numbers:
-                # During testing, send synchronously instead of in background
-                success, message = send_sms(phone, sms_content)
-                if not success:
-                    logger.error(f"Failed to send SMS: {message}")
+                try:
+                    # Instead of using background_tasks, send SMS synchronously
+                    success, message = send_sms(phone, sms_content)
+                    
+                    if success:
+                        # Log successful SMS sending
+                        key_event = KeyEvent(
+                            key_id=digital_key.id,
+                            event_type="key_sms_sent",
+                            device_info=f"API request by {current_user.email}",
+                            status="success",
+                            details=f"SMS sent to {phone} for {key_in.pass_type.value} pass",
+                            timestamp=datetime.now(timezone.utc)
+                        )
+                        db.add(key_event)
+                        success_count += 1
+                    else:
+                        # Log SMS failure with the error message
+                        failed_numbers.append(phone)
+                        event = KeyEvent(
+                            key_id=digital_key.id,
+                            event_type="key_sms_failed",
+                            device_info=f"API request by {current_user.email}",
+                            status="error", 
+                            details=f"Failed to send SMS to {phone}: {message}",
+                            timestamp=datetime.now(timezone.utc)
+                        )
+                        db.add(event)
+                    
+                except Exception as e:
+                    logger.error(f"Failed to send SMS to {phone}: {str(e)}")
                     failed_numbers.append(phone)
-                else:
-                    # Log SMS sending success
+                    
+                    # Log SMS failure
                     event = KeyEvent(
                         key_id=digital_key.id,
-                        event_type="key_sms_sent",
+                        event_type="key_sms_failed",
                         device_info=f"API request by {current_user.email}",
-                        status="success",
-                        details=f"SMS sent to {phone} for {key_in.pass_type.value} pass"
+                        status="error", 
+                        details=f"Failed to send SMS to {phone}: {str(e)}",
+                        timestamp=datetime.now(timezone.utc)
                     )
                     db.add(event)
-                    success_count += 1
-            
+
             db.commit()
             
             # Prepare response
@@ -308,7 +340,7 @@ def read_key(
         )
     
     # Check permissions for non-staff users
-    if current_user.role not in ["admin", "hotel_staff"]:
+    if current_user.role not in [UserRole.ADMIN, UserRole.HOTEL_STAFF]:
         reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
         if not reservation or reservation.user_id != current_user.id:
             raise HTTPException(
@@ -351,7 +383,8 @@ def update_key(
         event_type="key_updated",
         device_info=f"API request by {current_user.email}",
         status="success",
-        details=f"Status: {key.status}, Active: {key.is_active}"
+        details=f"Updated key status to {key_in.status}",
+        timestamp=datetime.now(timezone.utc)
     )
     db.add(event)
     db.commit()
@@ -379,6 +412,9 @@ def extend_key_validity(
             detail="Digital key not found"
         )
     
+    # Store original date before update for logging
+    original_valid_until = key.valid_until
+    
     # Update key validity
     key.valid_until = extension.new_end_date
     
@@ -387,34 +423,30 @@ def extend_key_validity(
     if reservation:
         reservation.check_out = extension.new_end_date
     
+    # Update key's updated_at timestamp for Apple Wallet change detection
+    key.updated_at = datetime.now(timezone.utc)
+    
     db.add(key)
     db.commit()
     db.refresh(key)
     
     try:
-        # Get all necessary data
-        room = db.query(Room).filter(Room.id == reservation.room_id).first()
-        user = db.query(User).filter(User.id == reservation.user_id).first()
-
-        pass_data = {
-            "key_uuid": key.key_uuid,
-            "room_number": room.room_number,
-            "guest_name": f"{user.first_name} {user.last_name}",
-            "check_in": reservation.check_in.isoformat(),
-            "check_out": reservation.check_out.isoformat(),  # Updated checkout date
-            "nfc_lock_id": room.nfc_lock_id,
-            "is_active": key.is_active
-        }
+        # Use update_checkout_date from key_service instead of manual updates
+        # This function handles all the necessary updates consistently
+        pass_data = update_checkout_date(key.key_uuid, extension.new_end_date, db)
         
-        # Use the existing function
-        create_wallet_pass(pass_data, key.pass_type)
-        
-        # Send push notification
-        background_tasks.add_task(
-            send_push_notifications_production,
-            settings.APPLE_PASS_TYPE_ID,
-            key.key_uuid
-        )
+        if pass_data:
+            # Create a new wallet pass with updated data
+            create_wallet_pass(pass_data, key.pass_type)
+            
+            # Send push notification to update the pass on user's device
+            background_tasks.add_task(
+                send_push_notifications_production,
+                settings.APPLE_PASS_TYPE_ID,
+                key.key_uuid
+            )
+        else:
+            logger.error(f"Failed to update pass data for key: {key_id}")
     
     except Exception as e:
         logger.error(f"Error updating pass: {str(e)}")
@@ -425,7 +457,8 @@ def extend_key_validity(
         event_type="key_extended",
         device_info=f"API request by {current_user.email}",
         status="success",
-        details=f"Extended until: {key.valid_until}"
+        details=f"Extended from {original_valid_until} until: {key.valid_until}",
+        timestamp=datetime.now(timezone.utc)
     )
     db.add(event)
     db.commit()
@@ -472,27 +505,27 @@ def extend_key_validity(
 
 
 @router.patch("/{key_id}/activate", response_model=DigitalKeySchema)
-def activate_key(
+def activate_key_endpoint(
     *,
     db: Session = Depends(get_db),
     key_id: str,
     current_user: User = Depends(get_current_user),
-    background_tasks: BackgroundTasks  # Add this parameter
+    background_tasks: BackgroundTasks
 ) -> Any:
     """
     Activate a digital key
     
     Staff can activate any key, but guests can only activate their own keys
     """
-    key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
-    if not key:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Digital key not found"
-        )
-    
     # Check permissions for non-staff users
-    if current_user.role not in ["admin", "hotel_staff"]:
+    if current_user.role not in [UserRole.ADMIN, UserRole.HOTEL_STAFF]:
+        key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
+        if not key:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Digital key not found"
+            )
+        
         reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
         if not reservation or reservation.user_id != current_user.id:
             raise HTTPException(
@@ -500,82 +533,103 @@ def activate_key(
                 detail="Not enough permissions"
             )
     
-    # Activate the key
-    key.is_active = True
-    key.status = KeyStatus.ACTIVE
-    key.activated_at = datetime.now(timezone.utc)
-    
-    db.add(key)
-    db.commit()
-    db.refresh(key)
-    
-    # Log key activation event
-    event = KeyEvent(
-        key_id=key.id,
-        event_type="key_activated",
-        device_info=f"API request by {current_user.email}",
-        status="success",
-        details=f"Activated at: {key.activated_at}"
-    )
-    db.add(event)
-    db.commit()
-    
-    # Add this: Update the pass in real-time
-    background_tasks.add_task(
-        update_wallet_pass_status,
-        db,
-        key.id,
-        is_active=True
-    )
-    
-    return key
+    try:
+        # Use the service function instead of duplicating logic
+        key = activate_key(db, key_id)
+        
+        # Add additional information to event log
+        event = KeyEvent(
+            key_id=key.id,
+            event_type="key_activated",
+            device_info=f"API request by {current_user.email}",
+            status="success",
+            details=f"Key activated by {current_user.first_name} {current_user.last_name}",
+            timestamp=datetime.now(timezone.utc)
+        )
+        db.add(event)
+        db.commit()
+        
+        # Update the wallet pass status immediately (not in background)
+        # This ensures the wallet receives the update right away
+        try:
+            update_wallet_pass_status(db, key.id, is_active=True)
+            logger.info(f"Wallet pass updated for key {key_id} to active state")
+        except Exception as wallet_error:
+            logger.error(f"Error updating wallet pass: {str(wallet_error)}")
+            # Don't fail the activation if wallet update fails
+            # Record the error
+            error_event = KeyEvent(
+                key_id=key.id,
+                event_type="wallet_update_failed",
+                device_info=f"API request by {current_user.email}",
+                status="error",
+                details=f"Failed to update wallet: {str(wallet_error)}",
+                timestamp=datetime.now(timezone.utc)
+            )
+            db.add(error_event)
+            db.commit()
+        
+        return key
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
 
 
 @router.patch("/{key_id}/deactivate", response_model=DigitalKeySchema)
-def deactivate_key(
+def deactivate_key_endpoint(
     *,
     db: Session = Depends(get_db),
     key_id: str,
     current_user: User = Depends(get_current_active_staff),
-    background_tasks: BackgroundTasks  # Add this parameter
+    background_tasks: BackgroundTasks
 ) -> Any:
     """
     Deactivate a digital key (staff only)
     """
-    key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
-    if not key:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Digital key not found"
+    try:
+        # Use the service function instead of duplicating logic
+        key = deactivate_key(db, key_id)
+        
+        # Add additional information to event log
+        event = KeyEvent(
+            key_id=key.id,
+            event_type="key_deactivated",
+            device_info=f"API request by {current_user.email}",
+            status="success",
+            details=f"Key deactivated by {current_user.first_name} {current_user.last_name}",
+            timestamp=datetime.now(timezone.utc)
         )
-    
-    # Deactivate the key
-    key.is_active = False
-    key.status = KeyStatus.REVOKED
-    
-    db.add(key)
-    db.commit()
-    db.refresh(key)
-    
-    # Log key deactivation event
-    event = KeyEvent(
-        key_id=key.id,
-        event_type="key_deactivated",
-        device_info=f"API request by {current_user.email}",
-        status="success"
-    )
-    db.add(event)
-    db.commit()
-    
-    # Add this: Update the pass in real-time
-    background_tasks.add_task(
-        update_wallet_pass_status,
-        db,
-        key.id,
-        is_active=False
-    )
-
-    return key
+        db.add(event)
+        db.commit()
+        
+        # Update the wallet pass status immediately (not in background)
+        # This ensures the wallet receives the update right away
+        try:
+            update_wallet_pass_status(db, key.id, is_active=False)
+            logger.info(f"Wallet pass updated for key {key_id} to inactive state")
+        except Exception as wallet_error:
+            logger.error(f"Error updating wallet pass: {str(wallet_error)}")
+            # Don't fail the deactivation if wallet update fails
+            # Record the error
+            error_event = KeyEvent(
+                key_id=key.id,
+                event_type="wallet_update_failed",
+                device_info=f"API request by {current_user.email}",
+                status="error",
+                details=f"Failed to update wallet: {str(wallet_error)}",
+                timestamp=datetime.now(timezone.utc)
+            )
+            db.add(error_event)
+            db.commit()
+        
+        return key
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
 
 @router.post("/{key_id}/send-email", status_code=status.HTTP_200_OK)
 def send_key_email_endpoint(
@@ -598,7 +652,7 @@ def send_key_email_endpoint(
         )
 
     # Check permissions for non-staff users
-    if current_user.role not in ["admin", "hotel_staff"]:
+    if current_user.role not in [UserRole.ADMIN, UserRole.HOTEL_STAFF]:
         reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
         if not reservation or reservation.user_id != current_user.id:
             raise HTTPException(
@@ -643,7 +697,7 @@ def send_key_email_endpoint(
     email_to_use = user.email
     
     # If alternative email is provided and the user has permissions, use it
-    if request and request.alternative_email and current_user.role in ["admin", "hotel_staff"]:
+    if request and request.alternative_email and current_user.role in [UserRole.ADMIN, UserRole.HOTEL_STAFF]:
         # Validate the alternative email
         is_valid, validation_message = validate_email(request.alternative_email)
         if not is_valid:
@@ -666,7 +720,8 @@ def send_key_email_endpoint(
                 event_type="key_email_failed",
                 device_info=f"API request by {current_user.email}",
                 status="error",
-                details=f"Invalid email: {email_to_use}. {validation_message}"
+                details=f"Invalid email: {email_to_use}. {validation_message}",
+                timestamp=datetime.now(timezone.utc)
             )
             db.add(event)
             db.commit()
@@ -693,7 +748,8 @@ def send_key_email_endpoint(
         event_type="key_email_sent",
         device_info=f"API request by {current_user.email}",
         status="success",
-        details=f"Email sent to {email_to_use} for {key.pass_type.value} pass"
+        details=f"Email sent to {email_to_use} for {key.pass_type.value} pass",
+        timestamp=datetime.now(timezone.utc)
     )
     db.add(event)
     db.commit()
@@ -722,7 +778,7 @@ def send_key_sms_endpoint(
         )
 
     # Check permissions for non-staff users
-    if current_user.role not in ["admin", "hotel_staff"]:
+    if current_user.role not in [UserRole.ADMIN, UserRole.HOTEL_STAFF]:
         reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
         if not reservation or reservation.user_id != current_user.id:
             raise HTTPException(
@@ -775,43 +831,35 @@ def send_key_sms_endpoint(
     success_count = 0
     failed_numbers = []
     
-    # Better for debug, synchronous, but it block the process
-    # for phone in valid_numbers:
-    #     # During testing, send synchronously instead of in background
-    #     success, message = send_sms(phone, sms_content)
-    #     if not success:
-    #         logger.error(f"Failed to send SMS: {message}")
-    #         failed_numbers.append(phone)
-    #     else:
-    #         # Log SMS sending success
-    #         event = KeyEvent(
-    #             key_id=key.id,
-    #             event_type="key_sms_sent",
-    #             device_info=f"API request by {current_user.email}",
-    #             status="success",
-    #             details=f"SMS sent to {phone} for {key.pass_type.value} pass"
-    #         )
-    #         db.add(event)
-    #         success_count += 1
-    # Better for production do not block the process
     for phone in valid_numbers:
         try:
-            background_tasks.add_task(
-                send_sms,
-                phone,
-                sms_content
-            )
+            # Instead of using background_tasks, send SMS synchronously
+            success, message = send_sms(phone, sms_content)
             
-            # Log SMS sending
-            event = KeyEvent(
-                key_id=key.id,
-                event_type="key_sms_sent",
-                device_info=f"API request by {current_user.email}",
-                status="success",
-                details=f"SMS sent to {phone} for {key.pass_type.value} pass"
-            )
-            db.add(event)
-            success_count += 1
+            if success:
+                # Log successful SMS sending
+                key_event = KeyEvent(
+                    key_id=key.id,
+                    event_type="key_sms_sent",
+                    device_info=f"API request by {current_user.email}",
+                    status="success",
+                    details=f"SMS sent to {phone} for {key.pass_type.value} pass",
+                    timestamp=datetime.now(timezone.utc)
+                )
+                db.add(key_event)
+                success_count += 1
+            else:
+                # Log SMS failure with the error message
+                failed_numbers.append(phone)
+                event = KeyEvent(
+                    key_id=key.id,
+                    event_type="key_sms_failed",
+                    device_info=f"API request by {current_user.email}",
+                    status="error", 
+                    details=f"Failed to send SMS to {phone}: {message}",
+                    timestamp=datetime.now(timezone.utc)
+                )
+                db.add(event)
             
         except Exception as e:
             logger.error(f"Failed to send SMS to {phone}: {str(e)}")
@@ -823,7 +871,8 @@ def send_key_sms_endpoint(
                 event_type="key_sms_failed",
                 device_info=f"API request by {current_user.email}",
                 status="error", 
-                details=f"Failed to send SMS to {phone}: {str(e)}"
+                details=f"Failed to send SMS to {phone}: {str(e)}",
+                timestamp=datetime.now(timezone.utc)
             )
             db.add(event)
 
@@ -846,6 +895,7 @@ def send_key_sms_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send SMS to any number. Please try again later."
         )
+
 
 @router.get("/{key_id}/events", response_model=List[KeyEventSchema])
 def read_key_events(
@@ -872,55 +922,3 @@ def read_key_events(
     ).offset(skip).limit(limit).all()
     
     return events
-
-# # TODO: add router and test it, copied from key_service
-# def regenerate_key(db: Session, key_id: str) -> Tuple[DigitalKey, str]:
-#     """
-#     Regenerate a digital key (create a new one based on existing)
-    
-#     Args:
-#         db: Database session
-#         key_id: Existing key ID
-    
-#     Returns:
-#         Tuple of (DigitalKey object, pass_url)
-    
-#     Raises:
-#         ValueError: If key not found or issues with creating a new key
-#     """
-#     try:
-#         # Get existing key
-#         old_key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
-#         if not old_key:
-#             raise ValueError("Digital key not found")
-        
-#         # Deactivate old key
-#         old_key.is_active = False
-#         old_key.status = KeyStatus.REVOKED
-#         db.add(old_key)
-        
-#         # Log deactivation
-#         event = KeyEvent(
-#             key_id=old_key.id,
-#             event_type="key_regenerated",
-#             timestamp=datetime.now(timezone.utc),
-#             status="success"
-#         )
-#         db.add(event)
-        
-#         # Create new key based on same reservation
-#         new_key, pass_url = create_digital_key(
-#             db=db,
-#             reservation_id=old_key.reservation_id,
-#             pass_type=old_key.pass_type
-#         )
-        
-#         return new_key, pass_url
-    
-#     except Exception as e:
-#         db.rollback()
-#         logger.error(f"Error regenerating key: {str(e)}")
-#         raise ValueError(f"Error regenerating key: {str(e)}")
-
-# TODO: maybe invoke functions in key_service that
-# do not exists here to create endpoints, like get_key_details, get_key_usage_history etc

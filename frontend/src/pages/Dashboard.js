@@ -395,16 +395,17 @@ function Dashboard() {
       // Parse the input date/time
       const dateObj = new Date(newEndDateTime);
       
-      // Use ISO string which includes milliseconds and timezone
-      const isoString = dateObj.toISOString();
+      // Preserve the user's intended local time by including time zone offset
+      // This will correctly communicate the intended local time to the server
+      const localISOString = new Date(
+        dateObj.getTime() - dateObj.getTimezoneOffset() * 60000
+      ).toISOString().slice(0, 19) + 'Z';
       
-      console.log(`Extending key ${keyId} to new end date/time (ISO): ${isoString}`);
-      
-      // Let's also log what the raw date-time input was
+      console.log(`Extending key ${keyId} to new end date/time: ${localISOString}`);
       console.log(`Original date-time input: ${newEndDateTime}`);
       
       await axios.patch(`${API_URL}/keys/${keyId}/extend`, 
-        { new_end_date: isoString },
+        { new_end_date: localISOString },
         {
           headers: { 'Authorization': `Bearer ${token}` }
         }

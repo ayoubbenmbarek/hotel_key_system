@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.db.session import get_db
 from app.security import get_current_user, get_current_active_staff, get_current_active_admin
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.hotel import Hotel
 from app.models.room import Room
 from app.models.reservation import Reservation
@@ -22,7 +22,7 @@ def get_current_user_hotel(
     # Get staff-hotel association
     staff = db.query(User).filter(
         User.id == current_user.id,
-        User.role.in_(["admin", "hotel_staff"])
+        User.role.in_([UserRole.ADMIN, UserRole.HOTEL_STAFF])
     ).first()
     
     if not staff:
@@ -80,7 +80,7 @@ def check_reservation_permissions(
     
     Staff can access any reservation, but guests can only access their own
     """
-    if current_user.role in ["admin", "hotel_staff"]:
+    if current_user.role in [UserRole.ADMIN, UserRole.HOTEL_STAFF]:
         return reservation
     
     if reservation.user_id != current_user.id:

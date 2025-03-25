@@ -1,5 +1,5 @@
 # backend/app/models/digital_key.py
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Enum, Integer
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Integer, Enum
 from sqlalchemy.orm import relationship
 import enum
 from datetime import datetime, timezone
@@ -56,22 +56,3 @@ class DigitalKey(BaseModel):
             self.status in [KeyStatus.CREATED, KeyStatus.ACTIVE] and
             self.valid_from <= now <= self.valid_until
         )
-
-
-class KeyEvent(BaseModel):
-    """
-    Event log for digital key usage
-    """
-    key_id = Column(String, ForeignKey("digitalkey.id"))
-    event_type = Column(String, nullable=False)  # access_attempt, access_granted, access_denied
-    device_info = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
-    location = Column(String)
-    status = Column(String)  # success, failure
-    details = Column(String)  # Additional details about the event
-    
-    # Relationships
-    digital_key = relationship("DigitalKey", back_populates="events")
-    
-    def __repr__(self):
-        return f"<KeyEvent {self.event_type} at {self.timestamp}>"

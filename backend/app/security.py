@@ -9,7 +9,7 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.user import TokenPayload
 from app.config import settings
 
@@ -81,7 +81,7 @@ def get_current_active_staff(current_user: User = Depends(get_current_user)) -> 
     
     Dependency to be used in FastAPI endpoints that require staff permissions
     """
-    if current_user.role not in ["admin", "hotel_staff"]:
+    if current_user.role not in [UserRole.ADMIN, UserRole.HOTEL_STAFF]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"
@@ -95,7 +95,7 @@ def get_current_active_admin(current_user: User = Depends(get_current_user)) -> 
     
     Dependency to be used in FastAPI endpoints that require admin permissions
     """
-    if current_user.role != "admin":
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"

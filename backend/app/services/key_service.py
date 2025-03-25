@@ -6,7 +6,8 @@ from typing import Optional, Dict, Any, List, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.models.digital_key import DigitalKey, KeyStatus, KeyType, KeyEvent
+from app.models.digital_key import DigitalKey, KeyStatus, KeyType
+from app.models.key_event import KeyEvent
 from app.models.reservation import Reservation, ReservationStatus
 from app.models.room import Room
 from app.models.user import User
@@ -217,7 +218,7 @@ def deactivate_key(db: Session, key_id: str) -> DigitalKey:
         logger.error(f"Error deactivating key: {str(e)}")
         raise ValueError(f"Error deactivating key: {str(e)}")
 
-
+# maybe update this with extend_key validity exists in keys.py
 def update_checkout_date(serial_number, new_checkout_date, db):
     """
     Update the checkout date for a digital key and its associated reservation
@@ -356,53 +357,53 @@ def get_active_keys(db: Session, user_id: Optional[str] = None) -> List[DigitalK
         return []
 
 
-# def regenerate_key(db: Session, key_id: str) -> Tuple[DigitalKey, str]:
-#     """
-#     Regenerate a digital key (create a new one based on existing)
+def regenerate_key(db: Session, key_id: str) -> Tuple[DigitalKey, str]:
+    """
+    Regenerate a digital key (create a new one based on existing)
     
-#     Args:
-#         db: Database session
-#         key_id: Existing key ID
+    Args:
+        db: Database session
+        key_id: Existing key ID
     
-#     Returns:
-#         Tuple of (DigitalKey object, pass_url)
+    Returns:
+        Tuple of (DigitalKey object, pass_url)
     
-#     Raises:
-#         ValueError: If key not found or issues with creating a new key
-#     """
-#     try:
-#         # Get existing key
-#         old_key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
-#         if not old_key:
-#             raise ValueError("Digital key not found")
+    Raises:
+        ValueError: If key not found or issues with creating a new key
+    """
+    try:
+        # Get existing key
+        old_key = db.query(DigitalKey).filter(DigitalKey.id == key_id).first()
+        if not old_key:
+            raise ValueError("Digital key not found")
         
-#         # Deactivate old key
-#         old_key.is_active = False
-#         old_key.status = KeyStatus.REVOKED
-#         db.add(old_key)
+        # Deactivate old key
+        old_key.is_active = False
+        old_key.status = KeyStatus.REVOKED
+        db.add(old_key)
         
-#         # Log deactivation
-#         event = KeyEvent(
-#             key_id=old_key.id,
-#             event_type="key_regenerated",
-#             timestamp=datetime.now(timezone.utc),
-#             status="success"
-#         )
-#         db.add(event)
+        # Log deactivation
+        event = KeyEvent(
+            key_id=old_key.id,
+            event_type="key_regenerated",
+            timestamp=datetime.now(timezone.utc),
+            status="success"
+        )
+        db.add(event)
         
-#         # Create new key based on same reservation
-#         new_key, pass_url = create_digital_key(
-#             db=db,
-#             reservation_id=old_key.reservation_id,
-#             pass_type=old_key.pass_type
-#         )
+        # Create new key based on same reservation
+        new_key, pass_url = create_digital_key(
+            db=db,
+            reservation_id=old_key.reservation_id,
+            pass_type=old_key.pass_type
+        )
         
-#         return new_key, pass_url
+        return new_key, pass_url
     
-#     except Exception as e:
-#         db.rollback()
-#         logger.error(f"Error regenerating key: {str(e)}")
-#         raise ValueError(f"Error regenerating key: {str(e)}")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error regenerating key: {str(e)}")
+        raise ValueError(f"Error regenerating key: {str(e)}")
 
 
 def get_expired_keys(db: Session) -> List[DigitalKey]:

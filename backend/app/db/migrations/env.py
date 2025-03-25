@@ -16,7 +16,8 @@ from app.models.user import User
 from app.models.hotel import Hotel, HotelStaff
 from app.models.room import Room, RoomLock
 from app.models.reservation import Reservation
-from app.models.digital_key import DigitalKey, KeyEvent
+from app.models.digital_key import DigitalKey
+from app.models.key_event import KeyEvent
 from app.models.device import DeviceRegistration
 
 # this is the Alembic Config object, which provides

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://166e-2a01-e0a-159-2b50-d852-e24a-103a-1ec0.ngrok-free.app/api/v1';
+const API_URL = process.env.REACT_APP_API_URL || 'https://8b8b-2a01-e0a-159-2b50-fc89-6241-570a-86b.ngrok-free.app/api/v1';
 
 function NFCSimulator() {
   const [keyUuid, setKeyUuid] = useState('');

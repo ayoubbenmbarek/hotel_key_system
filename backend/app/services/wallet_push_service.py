@@ -14,8 +14,8 @@ import httpx
 from app.config import settings
 from app.db.session import get_db
 from app.models.device import DeviceRegistration
-from app.models.digital_key import DigitalKey, KeyEvent
-
+from app.models.digital_key import DigitalKey
+from app.models.key_event import KeyEvent
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +225,8 @@ def send_push_notifications_production(pass_type_id, serial_number, db=None):
                                 event_type="push_notification_sent",
                                 device_info=f"Device: {registration.device_library_id}",
                                 status="success",
-                                details="Push notification sent successfully"
+                                details="Push notification sent successfully",
+                                timestamp=datetime.now(timezone.utc)
                             )
                             db.add(key_event)
                             db.commit()

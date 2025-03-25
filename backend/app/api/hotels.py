@@ -105,7 +105,7 @@ def update_hotel(
     db.add(hotel)
     db.commit()
     db.refresh(hotel)
-    
+
     return hotel
 
 

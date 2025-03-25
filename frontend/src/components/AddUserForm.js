@@ -23,6 +23,45 @@ function AddUserForm({ onSuccess, onCancel }) {
       [name]: value
     });
   };
+  // Safely parse and extract error messages from different error formats
+  const getErrorMessage = (err) => {
+    // Case 1: Error is an array of validation errors from Pydantic
+    if (err.response?.data && Array.isArray(err.response.data)) {
+      try {
+        return err.response.data.map(item => {
+          // Extract just the validation message without the "Value error, " prefix
+          const cleanMessage = item.msg.replace('Value error, ', '');
+          // For field-specific context, you can use: `${item.loc[1]}: ${cleanMessage}`
+          return cleanMessage;
+        }).join('. ');
+      } catch (e) {
+        console.error('Error parsing validation error:', e);
+        return 'Validation error occurred. Please check your inputs.';
+      }
+    }
+    
+    // Case 2: Error has a detail field
+    if (err.response?.data?.detail) {
+      return typeof err.response.data.detail === 'object'
+        ? JSON.stringify(err.response.data.detail)
+        : String(err.response.data.detail);
+    }
+    
+    // Case 3: Error response data is a string
+    if (typeof err.response?.data === 'string') {
+      return err.response.data;
+    }
+    
+    // Case 4: Error message is available
+    if (err.message) {
+      return typeof err.message === 'object'
+        ? JSON.stringify(err.message)
+        : String(err.message);
+    }
+    
+    // Default fallback
+    return 'An error occurred while creating the user';
+  };
 
   const handleCheckboxChange = (e) => {
     const { name, checked } = e.target;
@@ -73,9 +112,7 @@ function AddUserForm({ onSuccess, onCancel }) {
       onSuccess(response.data);
     } catch (err) {
       console.error('Error creating user:', err);
-      // Convert error to string to prevent React render issues
-      const errorMsg = err.response?.data?.detail || 'Failed to create user';
-      setError(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
