@@ -1,9 +1,9 @@
-
 from fastapi import APIRouter, Header,  HTTPException, Response, BackgroundTasks, Depends, Request
 from fastapi.responses import FileResponse
 from pathlib import Path
 import logging
 import uuid
+import re
 from typing import Optional
 from datetime import datetime, timezone
 
@@ -13,6 +13,7 @@ from app.models.digital_key import DigitalKey, KeyType
 from app.models.room import Room
 from app.models.reservation import Reservation
 from app.models.user import User
+from app.models.device_log import DeviceLog
 from app.services.wallet_service import create_wallet_pass
 from app.services.wallet_push_service import verify_auth_token, has_pass_been_updated
 
@@ -186,10 +187,13 @@ async def get_changed_passes(
     last_updated_str = last_updated.strftime("%Y-%m-%dT%H:%M:%SZ")
     
     # Return the response in the format expected by Apple Wallet
-    return {
+    response = {
         "serialNumbers": serial_numbers,
-        "lastUpdated": last_updated_str
+        "lastUpdated": last_updated_str  # This is the field required by Apple
     }
+    
+    logger.info(f"Returning response: {response}")
+    return response
 
 
 @router.post("/{pass_type}/devices/{device_library_id}/registrations/{pass_type_id}/{serial_number}")
@@ -287,12 +291,74 @@ async def get_device_registrations(
     return {"serialNumbers": serial_numbers}
 
 @router.post("/{pass_type}/log")
-async def log_message(request: Request):
-    """Receive log messages from devices"""
-    # You can parse and store these logs if needed
-    body = await request.json()
-    logger.info(f"Received log from device: {body}")
-    return Response(status_code=200)
+async def log_message(
+    pass_type: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Receive log messages from devices and store them in the database
+    
+    This endpoint receives logs from Apple Wallet and Google Wallet 
+    devices and saves them to the DeviceLog table.
+    """
+    try:
+        # Parse the request body
+        body = await request.json()
+        logger.info(f"Received log from device: {body}")
+        
+        # Extract logs array from the request
+        logs = body.get("logs", [])
+        
+        if not logs:
+            logger.warning("Received empty logs array")
+            return Response(status_code=200)
+        
+        # Get device information from headers if available
+        device_id = request.headers.get("User-Agent", "unknown-device")
+        
+        # For each log message in the array
+        for log_message in logs:
+            # Try to extract serial number from the log message
+            # Apple Wallet logs typically contain the pass type ID and sometimes serial number
+            serial_number = "unknown"
+            if "pass.com.azaynohotel.nfc" in log_message:
+                # Try to extract serial number if present
+                serial_match = re.search(r'serial number: ([a-zA-Z0-9-]+)', log_message)
+                if serial_match:
+                    serial_number = serial_match.group(1)
+            
+            # Determine log level based on content
+            log_level = "info"
+            if "error" in log_message.lower():
+                log_level = "error"
+            elif "warn" in log_message.lower():
+                log_level = "warning"
+            
+            # Create a new DeviceLog entry            
+            device_log = DeviceLog(
+                id=str(uuid.uuid4()),
+                device_id=device_id,
+                pass_type=pass_type,
+                serial_number=serial_number,
+                log_level=log_level,
+                message=log_message,
+                timestamp=datetime.now(timezone.utc)
+            )
+            
+            # Save to database
+            db.add(device_log)
+        
+        # Commit all logs in a single transaction
+        db.commit()
+        
+        # Return success response
+        return Response(status_code=200)
+    
+    except Exception as e:
+        logger.error(f"Error saving device log: {str(e)}")
+        db.rollback()
+        return Response(status_code=500)
 
 @router.delete("/{pass_type}/devices/{device_library_id}/registrations/{pass_type_id}/{serial_number}")
 # @router.delete("/devices/{device_library_id}/registrations/{pass_type_id}/{serial_number}")
