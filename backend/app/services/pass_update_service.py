@@ -30,6 +30,7 @@ def update_wallet_pass_status(db: Session, key_id: str, is_active: bool = True):
         # Update key status in database to ensure it's consistent
         key.is_active = is_active
         key.status = "ACTIVE" if is_active else "REVOKED"
+        key.updated_at = datetime.now(timezone.utc)
         
         # Get necessary data
         reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()

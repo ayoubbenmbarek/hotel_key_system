@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import http.client
 import uuid
 import httpx
+import email.utils
 
 from app.config import settings
 from app.db.session import get_db
@@ -127,29 +128,33 @@ def create_apns_token(team_id, key_id, private_key_path):
         logger.error(f"Error creating APNs token: {str(e)}")
         raise
 
-def has_pass_been_updated(digital_key, last_updated_str):
-    """Check if the pass has been updated since the last client update"""
+def has_pass_been_updated(digital_key, last_updated_header):
+    """
+    Check if a pass has been updated since the provided timestamp
+    
+    Args:
+        digital_key: The DigitalKey object
+        last_updated_header: The If-Modified-Since header value
+    
+    Returns:
+        True if the pass has been updated, False otherwise
+    """
     try:
         # Parse the If-Modified-Since header
-        last_updated = datetime.strptime(
-            last_updated_str.strip(), 
-            "%a, %d %b %Y %H:%M:%S %Z"
-        ).replace(tzinfo=timezone.utc)
+        client_last_update = email.utils.parsedate_to_datetime(last_updated_header)
         
-        # Use the key's updated_at timestamp or a related field
-        # Assuming your model has an updated_at field, or use another relevant timestamp
-        key_updated_at = digital_key.updated_at
-        if not key_updated_at:
+        # Get the last modified time of the pass
+        pass_last_modified = digital_key.updated_at
+        
+        # If updated_at is None, assume it's been updated
+        if not pass_last_modified:
             return True
-        
-        # Make sure the timestamp has timezone info
-        if key_updated_at.tzinfo is None:
-            key_updated_at = key_updated_at.replace(tzinfo=timezone.utc)
-        
-        # Return True if the key has been updated since last client update
-        return key_updated_at > last_updated
-    except (ValueError, TypeError):
-        # If there's any parsing error, assume the pass has been updated
+            
+        # Return True if the pass has been modified since the client's last update
+        return pass_last_modified > client_last_update
+    except Exception as e:
+        # If there's an error parsing the date, assume the pass has been updated
+        logger.warning(f"Error comparing timestamps: {str(e)}")
         return True
 
 

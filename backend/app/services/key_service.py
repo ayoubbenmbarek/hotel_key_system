@@ -13,6 +13,7 @@ from app.models.room import Room
 from app.models.user import User
 from app.services.wallet_service import create_wallet_pass
 from app.services.email_service import send_key_email
+from app.services.pass_update_service import update_wallet_pass_status
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +147,8 @@ def update_checkout_date(serial_number, new_checkout_date, db):
             logger.warning(f"Reservation not found for digital key: {serial_number}")
         
         # Update the key's timestamp to trigger update detection
-        digital_key.updated_at = datetime.now(timezone.utc)
+        current_time = datetime.now(timezone.utc)
+        digital_key.updated_at = current_time
         
         # Commit changes to database
         db.add(digital_key)
@@ -345,14 +347,34 @@ def expire_outdated_keys(db: Session) -> int:
                 key_id=key.id,
                 event_type="key_expired",
                 timestamp=datetime.now(timezone.utc),
-                status="success"
+                status="success",
+                details="Key automatically expired by system"
             )
             
             db.add(key)
             db.add(event)
+            
+            # Update the key in the database first
+            db.commit()
+            
+            # Then update the wallet pass status
+            try:
+                update_wallet_pass_status(db, key.id, is_active=False)
+                logger.info(f"Wallet pass updated for expired key {key.id}")
+            except Exception as wallet_error:
+                logger.error(f"Error updating wallet pass for expired key {key.id}: {str(wallet_error)}")
+                # Record the error but continue processing other keys
+                error_event = KeyEvent(
+                    key_id=key.id,
+                    event_type="wallet_update_failed",
+                    status="error",
+                    details=f"Failed to update wallet after expiration: {str(wallet_error)}",
+                    timestamp=datetime.now(timezone.utc)
+                )
+                db.add(error_event)
+                db.commit()
+            
             count += 1
-        
-        db.commit()
         
         if count > 0:
             logger.info(f"Deactivated {count} expired keys")

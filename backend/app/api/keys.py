@@ -43,6 +43,7 @@ class SendEmailRequest(BaseModel):
     alternative_email: Optional[str] = None
 # Add this to your backend/app/api/keys.py file
 
+# TODO: move it to key_service.py
 @router.post("", response_model=DigitalKeySchema, status_code=status.HTTP_201_CREATED)
 def create_digital_key(
     *,
@@ -392,7 +393,6 @@ def update_key(
     return key
 
 
-# TODO: add validation for extend_key validity, checkout could not be < checkin date, like reservation i think
 @router.patch("/{key_id}/extend", response_model=DigitalKeySchema)
 def extend_key_validity(
     *,
@@ -412,32 +412,58 @@ def extend_key_validity(
             detail="Digital key not found"
         )
     
-    # Store original date before update for logging
+    # Get the reservation to check check-in date
+    reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
+    if not reservation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reservation not found for this key"
+        )
+    
+    # Ensure both dates are timezone-aware
+    check_in = reservation.check_in
+    new_end_date = extension.new_end_date
+    
+    if check_in.tzinfo is None:
+        check_in = check_in.replace(tzinfo=timezone.utc)
+    
+    if new_end_date.tzinfo is None:
+        new_end_date = new_end_date.replace(tzinfo=timezone.utc)
+    
+    # Validate that new_end_date is after check_in
+    if new_end_date <= check_in:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Check-out date must be after check-in date"
+        )
+    
+    # Save original date for logging
     original_valid_until = key.valid_until
     
     # Update key validity
-    key.valid_until = extension.new_end_date
+    key.valid_until = new_end_date
     
     # Also update the reservation check-out date
-    reservation = db.query(Reservation).filter(Reservation.id == key.reservation_id).first()
-    if reservation:
-        reservation.check_out = extension.new_end_date
+    reservation.check_out = new_end_date
     
-    # Update key's updated_at timestamp for Apple Wallet change detection
-    key.updated_at = datetime.now(timezone.utc)
+    # IMPORTANT: Update the key's updated_at timestamp for Apple Wallet change detection
+    current_time = datetime.now(timezone.utc)
+    key.updated_at = current_time
     
+    # Make sure to save these changes to the database
     db.add(key)
+    db.add(reservation)
     db.commit()
     db.refresh(key)
     
     try:
         # Use update_checkout_date from key_service instead of manual updates
         # This function handles all the necessary updates consistently
-        pass_data = update_checkout_date(key.key_uuid, extension.new_end_date, db)
+        pass_data = update_checkout_date(key.key_uuid, new_end_date, db)
         
         if pass_data:
-            # Create a new wallet pass with updated data
-            create_wallet_pass(pass_data, key.pass_type)
+            # Create a new wallet pass with updated data - pass the db session
+            create_wallet_pass(pass_data, key.pass_type, db)
             
             # Send push notification to update the pass on user's device
             background_tasks.add_task(
@@ -458,7 +484,7 @@ def extend_key_validity(
         device_info=f"API request by {current_user.email}",
         status="success",
         details=f"Extended from {original_valid_until} until: {key.valid_until}",
-        timestamp=datetime.now(timezone.utc)
+        timestamp=current_time
     )
     db.add(event)
     db.commit()
@@ -577,6 +603,8 @@ def activate_key_endpoint(
         )
 
 
+# TODO: CHECK: these updates can sometimes be slow or if the wallet service occasionally has latency issues, 
+# moving to a background task would be better.
 @router.patch("/{key_id}/deactivate", response_model=DigitalKeySchema)
 def deactivate_key_endpoint(
     *,

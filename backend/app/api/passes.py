@@ -6,6 +6,8 @@ import uuid
 import re
 from typing import Optional
 from datetime import datetime, timezone
+import email.utils
+import time
 
 from app.services.wallet_push_service import send_push_notifications, send_push_notifications_production
 from app.models.device import DeviceRegistration
@@ -80,7 +82,7 @@ async def get_latest_pass(
     last_updated: Optional[str] = Header(None, alias="if-modified-since"),
 ):
     """Return the latest version of a pass"""
-    logger.info(f"Pass update request: {pass_type_id}:{serial_number}")
+    logger.info(f"Pass update request: {pass_type_id}:{serial_number}, If-Modified-Since: {last_updated}")
     
     # Verify auth token
     auth_header = request.headers.get("Authorization")
@@ -101,8 +103,28 @@ async def get_latest_pass(
         raise HTTPException(status_code=401, detail="Invalid authentication token")
     
     # Check if pass has been modified since last update
-    if last_updated and not has_pass_been_updated(digital_key, last_updated):
-        return Response(status_code=304)  # Not Modified
+    if last_updated and digital_key.updated_at:
+        try:
+            # Parse RFC 7232 datetime format
+            client_last_update = email.utils.parsedate_to_datetime(last_updated)
+            
+            # Ensure digital_key.updated_at has timezone info
+            pass_last_modified = digital_key.updated_at
+            if pass_last_modified.tzinfo is None:
+                pass_last_modified = pass_last_modified.replace(tzinfo=timezone.utc)
+            
+            # Ensure client_last_update has timezone info
+            if client_last_update.tzinfo is None:
+                client_last_update = client_last_update.replace(tzinfo=timezone.utc)
+            
+            logger.info(f"Comparing timestamps - Pass last modified: {pass_last_modified}, Client last update: {client_last_update}")
+            
+            # Compare timestamps and return 304 if not modified
+            if pass_last_modified <= client_last_update:
+                logger.info(f"Pass {serial_number} not modified since {last_updated}, returning 304")
+                return Response(status_code=304)  # Not Modified
+        except Exception as e:
+            logger.warning(f"Error processing If-Modified-Since header: {str(e)}", exc_info=True)
     
     # Get all necessary data to create a pass
     reservation = db.query(Reservation).filter(Reservation.id == digital_key.reservation_id).first()
@@ -125,8 +147,6 @@ async def get_latest_pass(
     }
     
     # Create a new .pkpass file
-    # pkpass_url = create_wallet_pass(pass_data, settings.APPLE_PASS_TYPE_ID)
-    # TODO: make it dynamic
     pkpass_url = create_wallet_pass(pass_data, digital_key.pass_type)
     
     # Return the actual .pkpass file
@@ -141,10 +161,22 @@ async def get_latest_pass(
     digital_key.last_used = datetime.now(timezone.utc)
     db.commit()
     
+    # Add the Last-Modified header to the response
+    headers = {
+        "Last-Modified": email.utils.formatdate(
+            time.mktime(digital_key.updated_at.timetuple()),
+            localtime=False, 
+            usegmt=True
+        )
+    }
+    
+    logger.info(f"Returning updated pass for {serial_number} with Last-Modified header")
+    
     return FileResponse(
         path=pkpass_path,
         media_type="application/vnd.apple.pkpass",
-        filename=pkpass_filename
+        filename=pkpass_filename,
+        headers=headers
     )
 
 @router.get("/{pass_type}/passes/{pass_type_id}")
@@ -298,9 +330,6 @@ async def log_message(
 ):
     """
     Receive log messages from devices and store them in the database
-    
-    This endpoint receives logs from Apple Wallet and Google Wallet 
-    devices and saves them to the DeviceLog table.
     """
     try:
         # Parse the request body
@@ -316,54 +345,63 @@ async def log_message(
         
         # Get device information from headers if available
         device_id = request.headers.get("User-Agent", "unknown-device")
+        logger.info(f"Processing logs for device: {device_id}")
         
         # For each log message in the array
         for log_message in logs:
-            # Try to extract serial number from the log message
-            # Apple Wallet logs typically contain the pass type ID and sometimes serial number
-            serial_number = "unknown"
-            if "pass.com.azaynohotel.nfc" in log_message:
-                # Try to extract serial number if present
-                serial_match = re.search(r'serial number: ([a-zA-Z0-9-]+)', log_message)
-                if serial_match:
-                    serial_number = serial_match.group(1)
-            
-            # Determine log level based on content
-            log_level = "info"
-            if "error" in log_message.lower():
-                log_level = "error"
-            elif "warn" in log_message.lower():
-                log_level = "warning"
-            
-            # Create a new DeviceLog entry            
-            device_log = DeviceLog(
-                id=str(uuid.uuid4()),
-                device_id=device_id,
-                pass_type=pass_type,
-                serial_number=serial_number,
-                log_level=log_level,
-                message=log_message,
-                timestamp=datetime.now(timezone.utc)
-            )
-            
-            # Save to database
-            db.add(device_log)
+            try:
+                # Try to extract serial number from the log message
+                serial_number = "unknown"
+                if "pass.com.azaynohotel.nfc" in log_message:
+                    # Try to extract serial number if present
+                    serial_match = re.search(r'serial number: ([a-zA-Z0-9-]+)', log_message)
+                    if serial_match:
+                        serial_number = serial_match.group(1)
+                
+                logger.info(f"Extracted serial number: {serial_number}")
+                
+                # Determine log level based on content
+                log_level = "info"
+                if "error" in log_message.lower():
+                    log_level = "error"
+                elif "warn" in log_message.lower():
+                    log_level = "warning"
+                
+                # Create a new DeviceLog entry  
+                log_id = str(uuid.uuid4())         
+                device_log = DeviceLog(
+                    id=log_id,
+                    device_id=device_id,
+                    pass_type=pass_type,
+                    serial_number=serial_number,
+                    log_level=log_level,
+                    message=log_message,
+                    timestamp=datetime.now(timezone.utc)
+                )
+                
+                logger.info(f"Created device log entry with ID: {log_id}")
+                
+                # Save to database
+                db.add(device_log)
+                logger.info(f"Added device log to session, preparing to commit")
+            except Exception as individual_error:
+                logger.error(f"Error processing individual log message: {str(individual_error)}")
         
         # Commit all logs in a single transaction
         db.commit()
+        logger.info(f"Successfully committed {len(logs)} device logs to database")
         
         # Return success response
         return Response(status_code=200)
     
     except Exception as e:
-        logger.error(f"Error saving device log: {str(e)}")
+        logger.error(f"Error saving device log: {str(e)}", exc_info=True)
         db.rollback()
         return Response(status_code=500)
 
 @router.delete("/{pass_type}/devices/{device_library_id}/registrations/{pass_type_id}/{serial_number}")
-# @router.delete("/devices/{device_library_id}/registrations/{pass_type_id}/{serial_number}")
 async def unregister_device(
-    pass_type: str,  # 'apple' or 'google'
+    pass_type: str,
     device_library_id: str,
     pass_type_id: str,
     serial_number: str,
@@ -373,16 +411,18 @@ async def unregister_device(
     """Unregister a device from receiving push notifications for a pass"""
     logger.info(f"Unregistration request: Pass={pass_type_id}:{serial_number}, Device={device_library_id}")
     
-    # Extract and verify auth token
+    # Extract auth token but be lenient with verification
     auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("ApplePass "):
-        logger.error("Invalid authorization header in unregistration request")
-        raise HTTPException(status_code=401, detail="Invalid authentication")
+    logger.info(f"Received unregister request with auth: {auth_header}")
     
-    auth_token = auth_header.replace("ApplePass ", "")
-    if not verify_auth_token(serial_number, auth_token, db):
-        logger.error(f"Invalid authentication token for pass: {serial_number}")
-        raise HTTPException(status_code=401, detail="Invalid authentication token")
+    # Check if the key exists, but don't require auth token match for unregistration
+    digital_key = db.query(DigitalKey).filter(DigitalKey.key_uuid == serial_number).first()
+    
+    if digital_key:
+        logger.info(f"Found key with stored auth token: {digital_key.auth_token}")
+    else:
+        # Even if key doesn't exist, allow unregistration to proceed
+        logger.warning(f"Digital key not found: {serial_number}, but proceeding with unregistration")
     
     # Find and update the registration
     registration = db.query(DeviceRegistration).filter(
@@ -400,6 +440,7 @@ async def unregister_device(
     else:
         logger.warning(f"No registration found to unregister: {device_library_id} for pass {serial_number}")
     
+    # Always return 200 OK for unregistration to avoid client errors
     return Response(status_code=200)
 
 @router.get("/devices/{device_id}/registrations/{pass_type_id}")
@@ -442,3 +483,19 @@ async def update_pass(
     background_tasks.add_task(send_push_notifications, pass_type_id, serial_number)
     
     return {"status": "updating", "message": "Pass update initiated"}
+
+# todo:
+#     ### 7. Multi-tenant Architecture
+
+# ```
+# Implement multi-tenant architecture for serving multiple hotels:
+
+# 1. Design database with tenant isolation:
+#    - Tenant identification in models
+#    - Query filtering by tenant
+#    - Resource isolation between tenants
+
+# 2. Implement tenant management:
+#    - Tenant creation and provisioning
+#    - Tenant configuration storage
+#    - Tenant-specific settings

@@ -7,6 +7,7 @@ import logging
 from logging.config import dictConfig
 from app.db.session import SessionLocal
 import time
+import asyncio
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.router import api_router
@@ -89,6 +90,12 @@ def startup_event():
         from app.services.wallet_service import update_auth_tokens_for_existing_keys
         updated = update_auth_tokens_for_existing_keys(db)
         logger.info(f"Startup: Updated auth tokens for {updated} keys")
+        
+        # Remove the check for expired keys on startup
+        # from app.services.key_service import expire_outdated_keys
+        # deactivated = expire_outdated_keys(db)
+        # if deactivated > 0:
+        #     logger.info(f"Startup: Deactivated {deactivated} expired keys")
     finally:
         db.close()
 
@@ -105,6 +112,7 @@ async def lifespan(app: FastAPI):
     # Create database tables
     create_tables()
     
+    # Run startup tasks
     startup_event()
     
     logger.info("Application startup complete")
@@ -115,8 +123,8 @@ async def lifespan(app: FastAPI):
     # Shutdown tasks
     logger.info("Shutting down application...")
     
-    # Optional: Add any cleanup tasks
-    # For example, closing database connections, clearing caches, etc.
+    # No scheduled_key_expiration task to cancel
+    
     logger.info("Application shutdown complete")
 
 
@@ -154,8 +162,6 @@ def get_application():
     return app
 
 app = get_application()
-
-# app.add_event_handler("startup", startup_event)
 
 if __name__ == "__main__":
     import uvicorn

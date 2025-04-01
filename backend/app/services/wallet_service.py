@@ -53,10 +53,10 @@ def update_auth_tokens_for_existing_keys(db):
 
 def create_wallet_pass(pass_data, pass_type, db=None):
     """
-    Create a wallet pass based on the requested type
+    Create a wallet pass based on pass type
     """
     if pass_type == KeyType.APPLE:
-        return create_apple_wallet_pass(pass_data, db=db)
+        return create_apple_wallet_pass(pass_data, db)
     elif pass_type == KeyType.GOOGLE:
         return create_google_wallet_pass(pass_data)
     else:

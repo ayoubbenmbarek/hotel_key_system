@@ -1,5 +1,5 @@
 # backend/app/schemas/digital_key.py
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from typing import Optional, List
 from datetime import datetime, timezone
 from enum import Enum
@@ -43,17 +43,15 @@ class DigitalKeyUpdate(BaseModel):
 class KeyExtension(BaseModel):
     new_end_date: datetime
     
-    @field_validator('new_end_date')
-    def validate_end_date(cls, v):
-        # Convert to timezone-aware datetime if it's naive
-        if v.tzinfo is None:
-            v = v.replace(tzinfo=timezone.utc)
+    @model_validator(mode='after')
+    def validate_dates(self) -> 'KeyExtension':
+        # Ensure we're working with timezone-aware objects
+        if self.new_end_date.tzinfo is None:
+            self.new_end_date = self.new_end_date.replace(tzinfo=timezone.utc)
             
-        # Now compare with current time (also timezone-aware)
-        now = datetime.now(timezone.utc)
-        if v < now:
-            raise ValueError('New end date must be in the future')
-        return v
+        # When validating in the model, we don't have access to the check-in date
+        # The actual date comparison should be done in the API endpoint
+        return self
 
 
 # Properties for key events
