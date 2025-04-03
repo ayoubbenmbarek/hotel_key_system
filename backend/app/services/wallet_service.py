@@ -229,7 +229,7 @@ def create_apple_wallet_pass(pass_data, db=None):
                     "relevantDate": formatted_check_in,
                     "expirationDate": formatted_check_out,
                     "voided": not pass_data.get('is_active', True),
-                    "webServiceURL": (settings.PASS_BASE_URL or "https://8b8b-2a01-e0a-159-2b50-fc89-6241-570a-86b.ngrok-free.app/api/v1/passes") + "/",
+                    "webServiceURL": (settings.PASS_BASE_URL or "https://cc1d-2a01-e0a-159-2b50-2d64-56ca-b251-5192.ngrok-free.app/api/v1/passes") + "/",
                     "authenticationToken": auth_token
                 }
 

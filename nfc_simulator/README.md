@@ -40,7 +40,7 @@ python simulator.py <key_uuid>
 ### Options
 
 ```
---api URL       API URL (default: https://8b8b-2a01-e0a-159-2b50-fc89-6241-570a-86b.ngrok-free.app/api/v1)
+--api URL       API URL (default: https://cc1d-2a01-e0a-159-2b50-2d64-56ca-b251-5192.ngrok-free.app/api/v1)
 --lock ID       Lock ID (default: LOCK-A123B456)
 --device INFO   Device info (default: NFC Simulator v1.0)
 --location LOC  Device location (default: Main Entrance)

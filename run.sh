@@ -92,7 +92,7 @@ else
 fi
 
 echo "System is ready!"
-echo "Access the API at: https://8b8b-2a01-e0a-159-2b50-fc89-6241-570a-86b.ngrok-free.app/api/v1/docs"
+echo "Access the API at: https://cc1d-2a01-e0a-159-2b50-2d64-56ca-b251-5192.ngrok-free.app/api/v1/docs"
 echo "Access email testing at: http://localhost:8025"
 echo "Access database admin at: http://localhost:8080 (postgres/password)"
 echo "use flag --reset to reset database and remove all data"

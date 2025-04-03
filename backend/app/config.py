@@ -105,10 +105,10 @@ class Settings(BaseSettings):
     HOTEL_ICON_URL: str = get_env("HOTEL_ICON_URL", "./backend/static/images/hotel_icon.png")
     
     # Frontend URLs
-    # FRONTEND_URL: str = get_env("FRONTEND_URL", "https://8b8b-2a01-e0a-159-2b50-fc89-6241-570a-86b.ngrok-free.app")
+    # FRONTEND_URL: str = get_env("FRONTEND_URL", "https://cc1d-2a01-e0a-159-2b50-2d64-56ca-b251-5192.ngrok-free.app")
     # if ngrok don't work:
     FRONTEND_URL: str = get_env("FRONTEND_URL", "http://localhost:3000")
-    PASS_BASE_URL: str = get_env("PASS_BASE_URL", "https://8b8b-2a01-e0a-159-2b50-fc89-6241-570a-86b.ngrok-free.app/api/v1/passes/")
+    PASS_BASE_URL: str = get_env("PASS_BASE_URL", "https://cc1d-2a01-e0a-159-2b50-2d64-56ca-b251-5192.ngrok-free.app/api/v1/passes/")
     
     model_config = SettingsConfigDict(
         env_file=".env",
